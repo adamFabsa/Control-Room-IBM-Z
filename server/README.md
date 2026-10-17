@@ -25,6 +25,7 @@ A bad action sent over the WebSocket gets `{"error": "..."}` back to that client
 - **`{"type": "new_game", "storm": "uri2021", "seed": 42}`** resets the game (server only).
 - Speeds: 1 = 20 s, 2 = 10 s, 3 = 5 s, 4 = 2 s, 5 = 0.5 s per game hour.
 - Phases the server expects from the engine: `prepare`, `storm`, then anything else (e.g. `over`) when the storm ends.
+- **`demand_mw`** during the storm is M1's Dallas County forecast for that hour (`demand_source: "M1"`), replacing the engine's placeholder formula.
 - **`totals.accounts_no_power` and `totals.medical_no_power`**: customer accounts (and those with a medical device) on cut circuits, counted from the 1 million encrypted customer records. They update a moment after each cut or restore; absent if the database is down.
 - **Players** for the report are `decide(state) -> [actions]`, called once per step (`app/players.py`). They only read the state JSON, so they work with any engine that follows the contract.
 

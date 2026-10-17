@@ -23,6 +23,7 @@ session = GameSession()
 
 @asynccontextmanager
 async def lifespan(app):
+    logging.getLogger("controlroom").info("M2 backend: %s", m2.get().backend)
     clock = asyncio.create_task(session.run_clock())
     yield
     clock.cancel()
@@ -65,11 +66,14 @@ def _cpu():
 def get_ai():
     """Evidence for the video: the hardware and every AI part's numbers."""
     m1 = MODELS / "m1_meta.json"
+    telum = Path(__file__).resolve().parents[2] / "ai" / "telum_results.json"
     job = session.job
     return {"platform": _cpu(),
-            "m1_forecast": json.loads(m1.read_text())["metrics"] if m1.exists() else None,
-            "m2_what_if": ({**m2.get().meta["metrics"], "server_inference": m2.get().accelerator}
+            "m1_forecast": ({**json.loads(m1.read_text())["metrics"], "in_game": session.forecast.available}
+                            if m1.exists() else None),
+            "m2_what_if": ({**m2.get().meta["metrics"], "server_backend": m2.get().backend}
                            if m2.get().available else None),
+            "m2_telum_benchmark": json.loads(telum.read_text()) if telum.exists() else None,
             "m3_analyst": analyst.summary_stats(),
             "records": session.records.stats(),
             "last_report": {"turning_points": job.turning_points_run,

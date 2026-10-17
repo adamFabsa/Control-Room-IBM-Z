@@ -1,0 +1,33 @@
+{
+  "when": "2026-10-17T19:39:57+00:00",
+  "machine": "9175",
+  "arch": "s390x",
+  "snapml": "1.17.2",
+  "engine": "stormgame",
+  "input_rows_from_games": 15375,
+  "features": 154,
+  "cpu": {
+    "tree_format": "compress_trees",
+    "single_ms_median": 0.034,
+    "single_ms_p95": 0.035,
+    "batch_1000_ms": 2.0,
+    "batch_1000_rows_per_sec": 499258,
+    "batch_10000_ms": 19.94,
+    "batch_10000_rows_per_sec": 501621
+  },
+  "telum": {
+    "tree_format": "zdnn_tensors",
+    "single_ms_median": 0.059,
+    "single_ms_p95": 0.062,
+    "batch_1000_ms": 8.64,
+    "batch_1000_rows_per_sec": 115744,
+    "batch_10000_ms": 108.89,
+    "batch_10000_rows_per_sec": 91838
+  },
+  "agreement": {
+    "max_abs_diff_cold_person_hours": 0.0,
+    "max_abs_diff_dark_probability": 0.0,
+    "same_best_move_pct": 100.0,
+    "match": true
+  }
+}

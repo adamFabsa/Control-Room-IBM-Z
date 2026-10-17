@@ -169,31 +169,18 @@ def main():
         metrics["dark_accuracy"] = round(float(accuracy_score(y_dark[test], prob > 0.5)), 3)
         metrics["dark_auc"] = round(float(roc_auc_score(y_dark[test], prob)), 3)
 
-    one, batch = X[test][:1], X[test][:15]
-    for name, model in (("cpu", reg),):
-        t = time.perf_counter()
-        for _ in range(500):
-            model.predict(one)
-        metrics[f"ms_per_prediction_{name}"] = round((time.perf_counter() - t) / 500 * 1000, 3)
-        t = time.perf_counter()
-        for _ in range(200):
-            model.predict(batch)
-        metrics[f"ms_per_15_moves_{name}"] = round((time.perf_counter() - t) / 200 * 1000, 3)
-    try:  # tree inference on the IBM Z on-chip AI accelerator (NNPA) through zDNN
-        nnpa = pickle.loads(pickle.dumps(reg))
-        nnpa.optimize_trees(tree_format="zdnn_tensors")
-        nnpa.predict(one)
-        t = time.perf_counter()
-        for _ in range(500):
-            nnpa.predict(one)
-        metrics["ms_per_prediction_nnpa"] = round((time.perf_counter() - t) / 500 * 1000, 3)
-        t = time.perf_counter()
-        for _ in range(200):
-            nnpa.predict(batch)
-        metrics["ms_per_15_moves_nnpa"] = round((time.perf_counter() - t) / 200 * 1000, 3)
-        metrics["nnpa_matches_cpu"] = bool(np.allclose(nnpa.predict(batch), reg.predict(batch), rtol=1e-3, atol=1))
-    except Exception as e:
-        metrics["nnpa"] = f"unavailable: {e}"
+    one = X[test][:1]
+    for name, tree_format in (("cpu", "compress_trees"), ("telum", "zdnn_tensors")):
+        try:  # optimized CPU trees vs the on-chip AI accelerator; full benchmark: ai/telum_benchmark.py
+            model = pickle.loads(pickle.dumps(reg))
+            model.optimize_trees(tree_format=tree_format)
+            model.predict(one, n_jobs=1)
+            t = time.perf_counter()
+            for _ in range(500):
+                model.predict(one, n_jobs=1)
+            metrics[f"ms_per_prediction_{name}"] = round((time.perf_counter() - t) / 500 * 1000, 3)
+        except Exception as e:
+            metrics[f"ms_per_prediction_{name}"] = f"unavailable: {e}"
     print(json.dumps(metrics, indent=2))
 
     with open(MODELS / "m2_cph.pkl", "wb") as f:

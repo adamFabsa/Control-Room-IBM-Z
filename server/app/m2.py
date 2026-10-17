@@ -8,6 +8,7 @@ Training: ai/m2/train_m2.py.
 import copy
 import json
 import logging
+import os
 import pickle
 from datetime import datetime
 from pathlib import Path
@@ -92,27 +93,42 @@ def switch_vectors(state, circuit_ids, on):
 
 
 class M2:
-    """Loaded Snap ML models; None-safe: `available` is False when they haven't been trained yet."""
+    """Loaded Snap ML models; `available` is False when they haven't been trained yet.
+
+    Backend: Telum (tree_format "zdnn_tensors", the on-chip AI accelerator through zDNN) when present, else
+    CPU ("compress_trees"). A Telum error switches to CPU for good. M2_BACKEND=cpu forces the CPU path, which
+    ai/telum_benchmark.py measured faster for this model on this VM.
+    """
 
     def __init__(self, models=MODELS):
         self.available = False
+        self.backend = "none"
         try:
-            with open(models / "m2_cph.pkl", "rb") as f:
-                self.cph = pickle.load(f)
-            with open(models / "m2_dark.pkl", "rb") as f:
-                self.dark = pickle.load(f)
+            self.cpu = [self._load(models / name, "compress_trees") for name in ("m2_cph.pkl", "m2_dark.pkl")]
             self.meta = json.loads((models / "m2_meta.json").read_text())
             self.available = True
         except Exception as e:
             log.info("M2 not loaded (%s); AI picks fall back to the engine's", e)
             return
-        self.accelerator = "cpu"
-        try:  # run tree inference on the IBM Z on-chip AI accelerator (NNPA) through zDNN
-            self.cph.optimize_trees(tree_format="zdnn_tensors")
-            self.dark.optimize_trees(tree_format="zdnn_tensors")
-            self.accelerator = "nnpa"
-        except Exception as e:
-            log.info("M2 on CPU: %s", e)
+        self.telum = None
+        self.backend = "compress_trees (CPU)"
+        if os.environ.get("M2_BACKEND", "telum") != "cpu":
+            try:
+                self.telum = [self._load(models / name, "zdnn_tensors") for name in ("m2_cph.pkl", "m2_dark.pkl")]
+                if self.telum[0].booster_.optimized_tree_format_ == "zdnn_tensors":
+                    self.backend = "zdnn_tensors (Telum)"
+                else:
+                    self.telum = None
+            except Exception as e:
+                self.telum = None
+                log.info("Telum unavailable for M2: %s", e)
+
+    @staticmethod
+    def _load(path, tree_format):
+        with open(path, "rb") as f:
+            model = pickle.load(f)
+        model.optimize_trees(tree_format=tree_format)
+        return model
 
     def score(self, before, afters):
         """Predicted (cold person-hours change, chance a critical building goes dark, ranking cost) per move."""
@@ -122,12 +138,30 @@ class M2:
         return self._predict(switch_vectors(state, circuit_ids, on))[2]
 
     def _predict(self, X):
-        cph = self.cph.predict(X)
-        dark = self.dark.predict_proba(X)[:, 1]
+        n_jobs = 1 if len(X) <= 16 else None  # one thread is fastest for the game's few-move calls
+        if self.telum:
+            try:
+                return self._run(self.telum, X, n_jobs)
+            except Exception as e:
+                log.warning("M2 on Telum failed (%s); using the CPU from now on", e)
+                self.telum, self.backend = None, "compress_trees (CPU)"
+        return self._run(self.cpu, X, n_jobs)
+
+    @staticmethod
+    def _run(models, X, n_jobs):
+        cph = models[0].predict(X, n_jobs=n_jobs)
+        dark = models[1].predict_proba(X, n_jobs=n_jobs)[:, 1]
         return cph, dark, cph + dark * CRITICAL_PENALTY
 
     def pick_option(self, game, state):
-        """Best option on the open event card, by simulating each option's immediate effect."""
+        """Best option on the open event card, by simulating each option's immediate effect; None on any error."""
+        try:
+            return self._pick_option(game, state)
+        except Exception:
+            log.exception("M2 pick failed; the engine's pick stands")
+            return None
+
+    def _pick_option(self, game, state):
         afters = []
         for option in state["event"]["options"]:
             trial = game.clone()

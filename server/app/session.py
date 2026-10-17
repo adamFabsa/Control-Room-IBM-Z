@@ -4,6 +4,7 @@ import logging
 
 from . import analyst, m2
 from .engine import Game
+from .forecast import Forecast
 from .records import Records
 from .report import ReportJob
 
@@ -18,6 +19,7 @@ class GameSession:
     def __init__(self):
         self.clients = set()
         self.records = Records()
+        self.forecast = Forecast()
         self._tasks = set()
         self.new_game()
 
@@ -27,6 +29,8 @@ class GameSession:
         self.job = ReportJob()
         self.event_text = {}  # event id -> Granite's rewrite of the card
         self.event_pick = {}  # event id -> M2's pick and predictions
+        self.temps = []  # hourly outside °F during the storm, for M1
+        self._demand = (None, None)  # (hour, M1 demand) cache
         self.storm, self.seed = storm, seed
         self.game = Game(storm=storm, seed=seed)
         self.paused = True
@@ -41,6 +45,12 @@ class GameSession:
         s["paused"] = self.paused or s.get("event") is not None
         s["speed"] = self.speed
         self.records.add_totals(s)
+        if s["phase"] == "storm" and self.forecast.available:
+            hour = s["time"][:13]
+            if self._demand[0] != hour:  # M1 runs once per game hour
+                self.temps.append(s["outside_f"])
+                self._demand = (hour, round(self.forecast.dallas_mw(s, self.temps)))
+            s["demand_mw"], s["demand_source"] = self._demand[1], "M1"
         event = s.get("event")
         if event and self.event_text.get(event["id"]):
             event["ai_text"] = self.event_text[event["id"]]
