@@ -6,6 +6,6 @@ __pycache__/
 .venv/
 node_modules/
 web/dist/
-ai/models/
+ai/models/hf/
 *.gguf
 data/raw/
