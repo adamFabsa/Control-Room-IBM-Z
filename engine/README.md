@@ -47,6 +47,7 @@ Additions beyond the contract. Each is a new key or function, and nothing in the
 - **Ice line breaks** are seeded at game start (about one every 12 hours) and can hit any circuit, including protected ones.
 - **Generators** burn fuel only while their circuit is dark; 48 hours of fuel. A new generator refuels.
 - **Cutting a circuit with an unprotected critical building opens a card first** ("The water plant is about to lose power"). Options: send a generator (2 pts) / cut a different neighborhood / let it go dark.
+- **Several critical cuts at once** (for example a player sending a whole step's cuts): while a card is open, a cut that would darken another critical building is queued (`{"ok": true, "queued": true}`) and its card opens as soon as the current one is answered.
 - **Event cards** (each has a do-nothing default, the last option):
 
 | kind | fires when | options |
@@ -65,4 +66,4 @@ Additions beyond the contract. Each is a new key or function, and nothing in the
 
 ## Data
 
-Optional files in `data/` (or `$STORMGAME_DATA`): `openmeteo_dallas.csv` (Open-Meteo hourly export) and `eaglei_dallas_feb2021.csv` (EAGLE-I outages). When they are missing, the engine uses hand-made curves and says so in `state()["storm_note"]`. Generated storms come from real cold spells when the multi-year temperature file is present; otherwise they are synthetic.
+Optional files in `data/` (or `$STORMGAME_DATA`): `openmeteo_dallas.csv` (Open-Meteo hourly export), or else `openmeteo_texas_hourly.csv` (from `ai/data/fetch_data.py`, column `dallas_f`, UTC), and `eaglei_dallas_feb2021.csv` (EAGLE-I outages). With the repo's Texas file, Uri uses real Dallas temperatures (low −1.9°F) and generated storms are drawn from the 14 real 2005–2026 Dallas cold spells, stretched 0.8–1.25× and shifted a few degrees. Loading takes about 2 s once per process; each game after that is about 0.1–0.2 s. When they are missing, the engine uses hand-made curves and says so in `state()["storm_note"]`. Generated storms come from real cold spells when the multi-year temperature file is present; otherwise they are synthetic.

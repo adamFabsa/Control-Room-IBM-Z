@@ -24,6 +24,7 @@ DALLAS_CUSTOMERS = 1_100_000                            # used if the outage fil
 
 DATA_DIR = Path(os.environ.get("STORMGAME_DATA", Path(__file__).resolve().parents[2] / "data"))
 OPENMETEO_FILE = "openmeteo_dallas.csv"
+TEXAS_FILE = "openmeteo_texas_hourly.csv"     # written by ai/data/fetch_data.py
 EAGLEI_FILE = "eaglei_dallas_feb2021.csv"
 
 # Hand-made fallbacks, (hours after storm start, value). Shaped on the NWS DFW record for Feb 2021.
@@ -134,22 +135,32 @@ def _read_eaglei(path):
 
 def _sample(series, start, hours):
     """Interpolate a time series onto the storm's steps; None if it does not cover the storm."""
-    t0 = np.datetime64(start.replace(tzinfo=None))
-    x = (series.index.to_numpy().astype("datetime64[s]") - t0).astype(float) / 3600
+    t0 = np.datetime64(start.replace(tzinfo=None), "s")
+    x = (series.index.to_numpy().astype("datetime64[s]") - t0).astype("timedelta64[s]").astype(float) / 3600
     if len(x) < 2 or x[0] > hours[0] + 1 or x[-1] < hours[-1] - 1:
         return None
     return np.interp(hours, x, series.to_numpy(dtype=float))
 
 
+def _read_texas_hourly(path):
+    """ai/data/fetch_data.py output: time_utc plus one °F column per city."""
+    import pandas as pd
+    df = pd.read_csv(path, usecols=["time_utc", "dallas_f"])
+    idx = pd.DatetimeIndex(pd.to_datetime(df["time_utc"], format="%Y-%m-%dT%H:%M")).tz_localize("UTC")
+    s = pd.Series(df["dallas_f"].astype(float).to_numpy(), index=_to_local_naive(idx))
+    return s[~s.index.duplicated()].sort_index().dropna()
+
+
 @lru_cache(maxsize=1)
 def _temperature_series():
-    path = DATA_DIR / OPENMETEO_FILE
-    if not path.exists():
-        return None
-    try:
-        return _read_openmeteo(path)
-    except Exception:
-        return None
+    for name, reader in ((OPENMETEO_FILE, _read_openmeteo), (TEXAS_FILE, _read_texas_hourly)):
+        path = DATA_DIR / name
+        if path.exists():
+            try:
+                return reader(path)
+            except Exception:
+                pass
+    return None
 
 
 # ---------- the real storm ----------
@@ -226,7 +237,11 @@ def generated(seed):
     rng = np.random.default_rng([seed, 2026])
     spells = _cold_spells()
     if spells:
-        base = np.array(spells[rng.integers(len(spells))]) + rng.normal(0, 2)
+        spell = np.array(spells[rng.integers(len(spells))])
+        stretch = rng.uniform(0.8, 1.25)                     # longer or shorter than the real one
+        n = max(36, int(round((len(spell) - 1) * stretch)))
+        base = np.interp(np.linspace(0, len(spell) - 1, n + 1), np.arange(len(spell)), spell)
+        base = base + rng.normal(0, 3)
         note = "generated from a real Dallas cold spell (2005-2026)"
     else:
         base = _synthetic_hourly(rng)

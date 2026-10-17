@@ -108,6 +108,23 @@ class TestGenerator(unittest.TestCase):
         self.assertEqual(g.points, 8)
 
 
+    def test_second_critical_cut_waits_for_the_open_card(self):
+        g = storm_game()
+        first = g.try_apply({"type": "cut", "circuit": "C-04"})
+        self.assertIn("event", first)
+        second = g.try_apply({"type": "cut", "circuit": "C-05"})
+        self.assertTrue(second["ok"] and second.get("queued"))
+        self.assertTrue(g.try_apply({"type": "cut", "circuit": "C-10"})["ok"])   # ordinary cuts still work
+        self.assertFalse(g.is_on(g._cmap["C-10"]))
+        g.try_apply({"type": "choose", "event": g.event["id"], "option": "dark"})
+        self.assertEqual(g.event["kind"], "critical_cut")                        # the gas card opens next
+        self.assertEqual(g.event["data"]["building"], "gas-1")
+        g.try_apply({"type": "choose", "event": g.event["id"], "option": "dark"})
+        self.assertIsNone(g.event)
+        self.assertFalse(g.is_on(g._cmap["C-04"]))
+        self.assertFalse(g.is_on(g._cmap["C-05"]))
+
+
 class TestGas(unittest.TestCase):
     def test_gas_loss_multiplies_orders_until_two_hours_after(self):
         g = storm_game(order_mw=1000)

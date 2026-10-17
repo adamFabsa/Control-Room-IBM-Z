@@ -10,11 +10,14 @@ import argparse
 import json
 import time
 
-from stormgame import Game, play
+from stormgame import Game, load_storm, play
 
 
 def headless(args):
     players = [args.player] if args.player else ["playbook_2021", "greedy"]
+    t0 = time.perf_counter()
+    load_storm(args.storm, args.seed)
+    print(f"data load (once per process) {time.perf_counter() - t0:.2f}s")
     for name in players:
         t0 = time.perf_counter()
         g = play(name, storm=args.storm, seed=args.seed)

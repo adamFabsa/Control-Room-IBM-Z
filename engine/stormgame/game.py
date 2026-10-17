@@ -71,6 +71,7 @@ class Game:
         self.points = C.START_POINTS
         self.event = None
         self._event_n = 0
+        self._queued_cuts = []          # critical cuts asked for while another card was open
         self._next_ok = {}
 
         self.keep_gas = False
@@ -339,14 +340,25 @@ class Game:
         circuits = [c for c in self._targets(a.get("circuit")) if not c.cut]
         if any(c.protected for c in circuits):
             raise ValueError(f"{a.get('circuit')} is protected")
+        if any(self._exposed(c) for c in circuits if self.is_on(c)):
+            if self.event is not None:
+                # Another card is open: this one waits and opens as soon as that one is answered.
+                self._queued_cuts.append([c.id for c in circuits])
+                return {"queued": True}
+            return self._cut_or_ask([c.id for c in circuits])
+        for c in circuits:
+            c.cut = True
+
+    def _cut_or_ask(self, ids):
+        """Cut these circuits, or open a card first if that darkens a critical building."""
+        circuits = [self._cmap[i] for i in ids if i in self._cmap and not self._cmap[i].cut]
         exposed = [b for c in circuits if self.is_on(c) for b in self._exposed(c)]
         if exposed:
-            if self.event is not None:
-                raise ValueError("decide the open card first")
             self._open_critical_cut(circuits, exposed[0])
             return {"event": self.event["id"]}
         for c in circuits:
             c.cut = True
+        return {}
 
     def _act_restore(self, a):
         if self.phase != "storm":
@@ -364,6 +376,8 @@ class Game:
         self._resolve(ev, option)
         if self.event is ev:
             self.event = None
+        while self.event is None and self._queued_cuts:
+            self._cut_or_ask(self._queued_cuts.pop(0))
 
     # ---------- the clock ----------
 
@@ -449,6 +463,7 @@ class Game:
         self.phase = "over"
         self.end_reason = reason
         self.event = None
+        self._queued_cuts = []
         self._log_timeline()
 
     def _log_timeline(self):

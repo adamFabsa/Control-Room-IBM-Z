@@ -283,7 +283,7 @@ class TestFuzz(unittest.TestCase):
         self.assertLess(uri.outside_f.min(), 0)            # DFW hit -2°F
         for seed in range(500):
             s = load_storm("generated", seed)
-            self.assertGreaterEqual(s.n_steps, 48 * 12)
+            self.assertGreaterEqual(s.n_steps, 36 * 12)
             self.assertTrue((s.order_mw >= 0).all())
             self.assertTrue(math.isfinite(s.outside_f.sum()))
         import numpy as np
