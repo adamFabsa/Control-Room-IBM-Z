@@ -17,7 +17,7 @@ from pathlib import Path
 
 DATA = Path(__file__).resolve().parents[2] / "data"
 EIA_URL = "https://api.eia.gov/v2/electricity/rto/region-data/data/"
-EIA_START = "2015-07-01T00"  # EIA-930 begins July 2015
+EIA_START = "2019-01-01T00"  # the v2 API serves hourly region data from 2019
 PAGE = 5000
 # ERCOT's big load centres; the forecast weights them by population.
 CITIES = {"dallas": (32.78, -96.80), "houston": (29.76, -95.37),
@@ -26,9 +26,11 @@ WEATHER_START = "2005-01-01"
 
 
 def get_json(url, tries=4):
+    # The EIA gateway stalls requests with Python's default User-Agent.
+    request = urllib.request.Request(url, headers={"User-Agent": "controlroom-datathon/1.0"})
     for attempt in range(tries):
         try:
-            with urllib.request.urlopen(url, timeout=120) as r:
+            with urllib.request.urlopen(request, timeout=60) as r:
                 return json.load(r)
         except Exception as e:
             if attempt == tries - 1:

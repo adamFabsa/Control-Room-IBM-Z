@@ -41,8 +41,13 @@ def health():
 
 
 @app.get("/api/state")
-def get_state():
+async def get_state():
     return session.state()
+
+
+@app.get("/api/records")
+def get_records():
+    return session.records.stats()
 
 
 @app.post("/api/action")

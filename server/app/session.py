@@ -3,6 +3,7 @@ import asyncio
 import logging
 
 from .engine import Game
+from .records import Records
 
 log = logging.getLogger("controlroom")
 
@@ -14,6 +15,8 @@ TICK_S = 0.1  # at most 10 state messages a second
 class GameSession:
     def __init__(self):
         self.clients = set()
+        self.records = Records()
+        self._tasks = set()
         self.new_game()
 
     def new_game(self, storm="uri2021", seed=42):
@@ -30,6 +33,7 @@ class GameSession:
         s = self.game.state()
         s["paused"] = self.paused or s.get("event") is not None
         s["speed"] = self.speed
+        self.records.add_totals(s)
         return s
 
     async def handle(self, action):
@@ -52,7 +56,18 @@ class GameSession:
             self.log.append({"step": self.steps, "action": action})
             if kind == "start_storm":
                 self.paused = False
+            if kind in ("cut", "restore"):
+                self._spawn(self._recount(action["circuit"]))
         await self.broadcast()
+
+    def _spawn(self, coro):
+        task = asyncio.create_task(coro)
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+
+    async def _recount(self, circuit_id):
+        if await self.records.recount(circuit_id):
+            await self.broadcast()
 
     async def run_clock(self):
         loop = asyncio.get_running_loop()
@@ -87,9 +102,11 @@ class GameSession:
                 await self.broadcast()
 
     async def broadcast(self):
+        s = self.state()
+        for circuit_id in self.records.missing(s["circuits"]):  # circuits the engine cut on its own
+            self._spawn(self._recount(circuit_id))
         if not self.clients:
             return
-        s = self.state()
         for ws in list(self.clients):
             try:
                 await ws.send_json(s)

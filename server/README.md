@@ -14,6 +14,7 @@ Live at **http://148.100.98.237:8000**
 | `POST /api/action` | Body is one action JSON; returns the new state, or 400 with the reason |
 | `GET /api/report` | How-you-did data (shape below) |
 | `GET /api/health` | Engine in use (`stub` or `stormgame`), CPU arch, cores |
+| `GET /api/records` | Encrypted customer-record counting stats (records counted, records/s) |
 
 A bad action sent over the WebSocket gets `{"error": "..."}` back to that client only; it has no `time` field, so skip it when reading state.
 
@@ -23,6 +24,7 @@ A bad action sent over the WebSocket gets `{"error": "..."}` back to that client
 - **`{"type": "new_game", "storm": "uri2021", "seed": 42}`** resets the game (server only).
 - Speeds: 1 = 20 s, 2 = 10 s, 3 = 5 s, 4 = 2 s, 5 = 0.5 s per game hour.
 - Phases the server expects from the engine: `prepare`, `storm`, then anything else (e.g. `over`) when the storm ends.
+- **`totals.accounts_no_power` and `totals.medical_no_power`**: customer accounts (and those with a medical device) on cut circuits, counted from the 1 million encrypted customer records. They update a moment after each cut or restore; absent if the database is down.
 - **Players** for the report are `decide(state) -> [actions]`, called once per step (`app/players.py`). They only read the state JSON, so they work with any engine that follows the contract.
 
 ## Report JSON
