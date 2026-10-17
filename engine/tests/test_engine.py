@@ -21,23 +21,23 @@ def run(g, steps):
     """Step forward, answering any event card with its do-nothing default."""
     for _ in range(steps):
         while g.event:
-            g.apply({"type": "choose", "event": g.event["id"], "option": g.event["default"]})
+            g.try_apply({"type": "choose", "event": g.event["id"], "option": g.event["default"]})
         g.step()
 
 
 def storm_game(*buys, order_mw=0.0):
     g = Game(storm=unit_storm(order_mw), seed=1)
     for item, target in buys:
-        assert g.apply({"type": "buy", "item": item, "target": target})["ok"]
+        assert g.try_apply({"type": "buy", "item": item, "target": target})["ok"]
     g.start_storm()
     g.ice = []                                  # no random line breaks in unit tests
     return g
 
 
 def cut(g, cid, option="dark"):
-    g.apply({"type": "cut", "circuit": cid})
+    g.try_apply({"type": "cut", "circuit": cid})
     if g.event and g.event["kind"] == "critical_cut":
-        g.apply({"type": "choose", "event": g.event["id"], "option": option})
+        g.try_apply({"type": "choose", "event": g.event["id"], "option": option})
 
 
 class TestCooling(unittest.TestCase):
@@ -60,7 +60,7 @@ class TestCooling(unittest.TestCase):
         run(g, 12 * 5)
         self.assertLess(g._cmap["C-13"].indoor_f, 50)
         self.assertGreater(g.score()["cold_person_hours"], 0)
-        g.apply({"type": "restore", "circuit": "C-13"})
+        g.try_apply({"type": "restore", "circuit": "C-13"})
         run(g, 12 * 6)
         self.assertGreater(g._cmap["C-13"].indoor_f, 60)
 
@@ -68,7 +68,7 @@ class TestCooling(unittest.TestCase):
 class TestProtect(unittest.TestCase):
     def test_protected_circuit_cannot_be_cut(self):
         g = storm_game(("protect", "C-01"))
-        r = g.apply({"type": "cut", "circuit": "C-01"})
+        r = g.try_apply({"type": "cut", "circuit": "C-01"})
         self.assertFalse(r["ok"])
         self.assertTrue(g.is_on(g._cmap["C-01"]))
         self.assertEqual(g.points, 9)
@@ -98,11 +98,11 @@ class TestGenerator(unittest.TestCase):
 
     def test_cutting_an_exposed_building_opens_a_card(self):
         g = storm_game()
-        g.apply({"type": "cut", "circuit": "C-04"})
+        g.try_apply({"type": "cut", "circuit": "C-04"})
         self.assertEqual(g.event["kind"], "critical_cut")
         self.assertTrue(g.state()["paused"])
         self.assertTrue(g.is_on(g._cmap["C-04"]))  # nothing cut until decided
-        g.apply({"type": "choose", "event": g.event["id"], "option": "gen"})
+        g.try_apply({"type": "choose", "event": g.event["id"], "option": "gen"})
         self.assertFalse(g.is_on(g._cmap["C-04"]))
         self.assertTrue(g.building_on(g._bmap["water-1"]))
         self.assertEqual(g.points, 8)
@@ -117,7 +117,7 @@ class TestGas(unittest.TestCase):
         cut(g, "C-05")
         run(g, 1)
         self.assertAlmostEqual(g.order_now(), 1150)
-        g.apply({"type": "restore", "circuit": "C-05"})
+        g.try_apply({"type": "restore", "circuit": "C-05"})
         run(g, 24)
         self.assertAlmostEqual(g.order_now(), 1150)
         run(g, 1)
@@ -147,7 +147,7 @@ class TestWater(unittest.TestCase):
         g = storm_game()
         cut(g, "C-04")
         run(g, 30)
-        g.apply({"type": "restore", "circuit": "C-04"})
+        g.try_apply({"type": "restore", "circuit": "C-04"})
         run(g, 24 * 12 - 1)
         self.assertEqual(g.state()["boil_water_people"], 180_000)
         run(g, 2)
@@ -180,8 +180,8 @@ class TestOtherButtons(unittest.TestCase):
     def test_not_enough_points(self):
         g = Game(storm=unit_storm())
         for b in ("hospital-1", "dialysis-1", "water-1", "gas-1", "school-1"):
-            self.assertTrue(g.apply({"type": "buy", "item": "generator", "target": b})["ok"])
-        self.assertFalse(g.apply({"type": "buy", "item": "protect", "target": "C-01"})["ok"])
+            self.assertTrue(g.try_apply({"type": "buy", "item": "generator", "target": b})["ok"])
+        self.assertFalse(g.try_apply({"type": "buy", "item": "protect", "target": "C-01"})["ok"])
         self.assertEqual(g.points, 0)
 
     def test_ice_break_darkens_circuit_and_crews_shorten_it(self):
@@ -200,7 +200,7 @@ class TestOtherButtons(unittest.TestCase):
         run(g, 3)
         self.assertEqual(g.event["kind"], "short")
         run(g, 3)
-        self.assertEqual(g.phase, "done")
+        self.assertEqual(g.phase, "over")
         self.assertTrue(g.score()["grid_collapsed"])
 
 
@@ -211,7 +211,7 @@ class TestWholeGame(unittest.TestCase):
             t0 = time.perf_counter()
             a = play(player, storm="uri2021", seed=42)
             self.assertLess(time.perf_counter() - t0, 2.0)
-            self.assertEqual(a.phase, "done")
+            self.assertEqual(a.phase, "over")
             self.assertEqual(a.end_reason, "storm_over")
             b = play(player, storm="uri2021", seed=42)
             self.assertEqual(a.score(), b.score())

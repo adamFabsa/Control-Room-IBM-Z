@@ -9,6 +9,10 @@ from . import config as C
 from .storms import Storm, load_storm
 
 
+class ActionError(ValueError):
+    """An action that is malformed or not allowed right now."""
+
+
 def _steps(minutes):
     return int(round(minutes / C.STEP_MIN))
 
@@ -60,7 +64,7 @@ class Game:
         self.buildings = [Building(*row) for row in C.BUILDINGS]
         self._index()
 
-        self.phase = "prep"
+        self.phase = "prepare"
         self.k = 0
         self.paused = False
         self.speed = 1
@@ -137,7 +141,7 @@ class Game:
         return sum(f for a, b, f in self.conservation if a <= k < b)
 
     def order_now(self):
-        if self.phase == "prep":
+        if self.phase == "prepare":
             return 0.0
         mult = C.GAS_MULT if self.k <= self.gas_until else 1.0
         return float(self.storm.order_mw[self.k]) * mult * (1 - self.conservation_frac())
@@ -173,21 +177,22 @@ class Game:
     # ---------- actions ----------
 
     def apply(self, action):
-        """Apply one action JSON. Returns {"ok": True, ...} or {"ok": False, "error": ...}."""
+        """Apply one action JSON. Returns {"ok": True, ...}; raises ActionError (a ValueError)
+        for an action that is malformed or not allowed now, leaving the game unchanged."""
         if not isinstance(action, dict):
-            return {"ok": False, "error": "an action must be a JSON object"}
+            raise ActionError("an action must be a JSON object")
         kind = action.get("type")
         if not isinstance(kind, str):
-            return {"ok": False, "error": "an action needs a type"}
+            raise ActionError("an action needs a type")
         k, phase = self.k, self.phase
         event_kind = self.event["kind"] if self.event else None
+        handler = getattr(self, f"_act_{kind}", None)
+        if handler is None:
+            raise ActionError(f"unknown action type {kind!r}")
         try:
-            handler = getattr(self, f"_act_{kind}", None)
-            if handler is None:
-                raise ValueError(f"unknown action type {kind!r}")
             result = handler(action) or {}
         except ValueError as e:
-            return {"ok": False, "error": str(e)}
+            raise ActionError(str(e)) from None
         if kind not in ("pause", "play", "speed"):
             entry = {"step": k, "phase": phase, "action": dict(action)}
             if kind == "choose":
@@ -195,8 +200,15 @@ class Game:
             self.history.append(entry)
         return {"ok": True, **result}
 
+    def try_apply(self, action):
+        """Like apply, but returns {"ok": False, "error": ...} instead of raising."""
+        try:
+            return self.apply(action)
+        except ActionError as e:
+            return {"ok": False, "error": str(e)}
+
     def start_storm(self):
-        return self.apply({"type": "start_storm"})
+        return self.try_apply({"type": "start_storm"})
 
     def _act_pause(self, a):
         self.paused = True
@@ -213,7 +225,7 @@ class Game:
         self.speed = value
 
     def _act_start_storm(self, a):
-        if self.phase != "prep":
+        if self.phase != "prepare":
             raise ValueError("the storm has already started")
         self._plan_ice()
         self.phase = "storm"
@@ -247,7 +259,7 @@ class Game:
             if item not in C.STORM_ITEMS:
                 raise ValueError(f"{item} can only be bought in Get ready")
             return self._act_emergency(a)
-        if self.phase != "prep":
+        if self.phase != "prepare":
             raise ValueError("the game is over")
         self._buy(item, a.get("target"))
 
@@ -434,7 +446,7 @@ class Game:
                 del self.boil[b.id]
 
     def _end(self, reason):
-        self.phase = "done"
+        self.phase = "over"
         self.end_reason = reason
         self.event = None
         self._log_timeline()
@@ -642,9 +654,9 @@ class Game:
     # ---------- outputs ----------
 
     def _tip(self):
-        if self.phase == "prep":
+        if self.phase == "prepare":
             return self._prep_tip()
-        if self.phase == "done":
+        if self.phase == "over":
             return "The storm is over." if self.end_reason == "storm_over" else "The grid collapsed."
         soon = [(m, c) for c in self.circuits if not self.is_on(c)
                 for m in [self._cooling_minutes(c)] if m is not None]
@@ -685,7 +697,7 @@ class Game:
     def state(self):
         warmed = self._warmed()
         cold = self._cold_people(warmed)
-        time = self.storm.prep_time if self.phase == "prep" else self.storm.time_at(self.k)
+        time = self.storm.prep_time if self.phase == "prepare" else self.storm.time_at(self.k)
         ev = None
         if self.event:
             ev = {key: self.event[key] for key in ("id", "kind", "title", "text")}
@@ -742,7 +754,7 @@ class Game:
 
     def plan(self):
         """The Get ready purchases: the player's winter plan, reusable on other storms."""
-        return [h["action"] for h in self.history if h["phase"] == "prep" and h["action"]["type"] == "buy"]
+        return [h["action"] for h in self.history if h["phase"] == "prepare" and h["action"]["type"] == "buy"]
 
     def clone(self):
         """Deep copy for replays and the stress test. The storm data is shared, not copied."""

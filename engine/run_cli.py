@@ -96,7 +96,7 @@ def interactive(args):
             else:
                 print(HELP)
                 continue
-            r = g.apply(action)
+            r = g.try_apply(action)
             if not r["ok"]:
                 print("  !", r["error"])
         show(g)

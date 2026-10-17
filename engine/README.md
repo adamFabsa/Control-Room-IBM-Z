@@ -15,8 +15,9 @@ python -m unittest discover tests      # FUZZ_SEEDS=20 for a longer random-play 
 from stormgame import Game, play, replay
 
 g = Game(storm="uri2021", seed=42)      # or "generated", "test", or a Storm object
-g.apply({"type": "buy", "item": "generator", "target": "water-1"})   # -> {"ok": True} / {"ok": False, "error": ...}
-g.start_storm()
+g.apply({"type": "buy", "item": "generator", "target": "water-1"})   # -> {"ok": True}; bad/illegal action raises ActionError (a ValueError)
+g.try_apply(action)                     # same, but returns {"ok": False, "error": ...} instead of raising
+g.start_storm()                         # phase: "prepare" -> "storm" -> "over" (same names as the server's stand-in)
 g.step()            # 5 game minutes; does nothing while paused or while an event card is open
 g.state()           # state JSON (Shared contract 2)
 g.score()           # cold_person_hours, longest_outage_min, critical_dark_min, water_plants_lost, orders_met_pct, ...
@@ -58,7 +59,7 @@ Additions beyond the contract. Each is a new key or function, and nothing in the
 | `cold` | a dark circuit's homes cross 50°F within 60 min | `restore`, `warm`, `keep` |
 
   Options that cost points appear only when the player can afford them, and a card with only one possible answer is not shown, so every card has 2–3 options. `auto` cuts the warmest circuits that darken no critical building. Cooldowns: order_rise and short 60 min, cold 30 min.
-- **Bad input** (unknown types, wrong field types, non-objects) never raises: `apply` returns `{"ok": false, "error": ...}`.
+- **Bad input** (unknown types, wrong field types, non-objects, moves not allowed now) raises `ActionError` with a readable message and leaves the game unchanged; nothing else ever raises from `apply`.
 - **playbook_2021** protects the hospital, cuts in fixed order C-01→C-15, and rotates a circuit back on after 240 minutes dark.
 - **greedy** spends no points; every step it keeps the warmest circuits cut and the coldest on.
 

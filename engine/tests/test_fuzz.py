@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from stormgame import Game, play, replay  # noqa: E402
+from stormgame import ActionError, Game, play, replay  # noqa: E402
 from stormgame import config as C  # noqa: E402
 
 SEEDS = int(os.environ.get("FUZZ_SEEDS", "6"))
@@ -50,7 +50,7 @@ class Checker:
         text = json.dumps(s, allow_nan=False)          # serializable, no NaN/inf
         tc.assertIsInstance(json.loads(text), dict)
         tc.assertTrue(0 <= s["points"] <= C.START_POINTS)
-        tc.assertIn(s["phase"], ("prep", "storm", "done"))
+        tc.assertIn(s["phase"], ("prepare", "storm", "over"))
         tc.assertIn(s["speed"], (1, 2, 3, 4, 5))
 
         off = [c for c in g.circuits if not g.is_on(c)]
@@ -99,22 +99,22 @@ def fuzz_game(tc, storm, seed, actions_per_step=3, steps=None):
     g = Game(storm=storm, seed=seed)
     check = Checker(tc, g)
     for _ in range(rnd.randint(0, 12)):
-        r = g.apply(random_action(g, rnd))
+        r = g.try_apply(random_action(g, rnd))
         tc.assertIn("ok", r)
         check()
-    g.apply({"type": "start_storm"})
+    g.try_apply({"type": "start_storm"})
     tc.assertEqual(g.phase, "storm")
     n = 0
     prev_time = None
     while g.phase == "storm" and (steps is None or n < steps):
         for _ in range(rnd.randint(0, actions_per_step)):
-            r = g.apply(random_action(g, rnd))
+            r = g.try_apply(random_action(g, rnd))
             tc.assertIn("ok", r)
             check()
         if g.event and rnd.random() < 0.7:
-            g.apply({"type": "choose", "event": g.event["id"], "option": g.event["default"]})
+            g.try_apply({"type": "choose", "event": g.event["id"], "option": g.event["default"]})
         if g.paused and rnd.random() < 0.5:
-            g.apply({"type": "play"})
+            g.try_apply({"type": "play"})
         k = g.k
         g.step()
         if g.event is None and not g.paused and k == g.k and g.phase == "storm":
@@ -135,7 +135,7 @@ class TestFuzz(unittest.TestCase):
             for seed in range(SEEDS):
                 with self.subTest(storm=storm, seed=seed):
                     g = fuzz_game(self, storm, seed)
-                    if g.phase == "done":
+                    if g.phase == "over":
                         self.assertIn(g.end_reason, ("storm_over", "grid_collapse"))
 
     def test_random_games_replay_exactly(self):
@@ -143,9 +143,9 @@ class TestFuzz(unittest.TestCase):
             with self.subTest(seed=seed):
                 g = fuzz_game(self, "uri2021", seed)
                 while g.phase == "storm":         # finish games that stopped on a pause
-                    g.apply({"type": "play"})
+                    g.try_apply({"type": "play"})
                     while g.event:
-                        g.apply({"type": "choose", "event": g.event["id"], "option": g.event["default"]})
+                        g.try_apply({"type": "choose", "event": g.event["id"], "option": g.event["default"]})
                     g.step()
                 self.assertEqual(replay(g).score(), g.score())
 
@@ -155,7 +155,7 @@ class TestFuzz(unittest.TestCase):
         diffs = []
         for i in range(0, len(g.history), max(1, len(g.history) // 25)):
             r = replay(g, skip=i)
-            self.assertEqual(r.phase, "done")
+            self.assertEqual(r.phase, "over")
             diffs.append(r.score()["cold_person_hours"] - base)
         self.assertTrue(any(d != 0 for d in diffs))
 
@@ -165,9 +165,9 @@ class TestFuzz(unittest.TestCase):
             c = g.clone()
             for game in (g, c):
                 while game.phase == "storm":
-                    game.apply({"type": "play"})
+                    game.try_apply({"type": "play"})
                     while game.event:
-                        game.apply({"type": "choose", "event": game.event["id"], "option": game.event["default"]})
+                        game.try_apply({"type": "choose", "event": game.event["id"], "option": game.event["default"]})
                     game.step()
             self.assertEqual(g.score(), c.score())
             self.assertEqual(g.state(), c.state())
@@ -177,23 +177,39 @@ class TestFuzz(unittest.TestCase):
         bad = [{}, {"type": 5}, {"type": "buy", "item": "protect", "target": ["C-01"]},
                {"type": "speed", "value": {"x": 1}}, {"type": "cut", "circuit": {"a": 1}},
                {"type": "choose"}, {"type": "emergency", "item": "generator"}]
-        for phase in ("prep", "storm"):
+        for phase in ("prepare", "storm"):
             if phase == "storm":
                 g.start_storm()
             for a in bad:
-                r = g.apply(a)
+                r = g.try_apply(a)
                 self.assertFalse(r["ok"], a)
         for a in ("not a dict", None, 42):
-            self.assertFalse(g.apply(a)["ok"])
+            self.assertFalse(g.try_apply(a)["ok"])
+
+    def test_apply_raises_and_leaves_game_unchanged(self):
+        g = Game(storm="test")
+        g.start_storm()
+        g.try_apply({"type": "buy", "item": "protect", "target": "C-01"})
+        before = (json.dumps(g.state()), len(g.history), g.points)
+        for a in ({"type": "cut", "circuit": "C-99"}, {"type": "launch"}, "x",
+                  {"type": "emergency", "item": "generator", "target": "C-01"},
+                  {"type": "buy", "item": "smart_switch", "target": "C-02"},
+                  {"type": "choose", "event": "ev-1", "option": "gen"}):
+            with self.assertRaises(ValueError):
+                g.apply(a)
+            with self.assertRaises(ActionError):
+                g.apply(a)
+        self.assertEqual((json.dumps(g.state()), len(g.history), g.points), before)
+        self.assertTrue(g.start_storm() is not None)       # starting twice does not raise
 
     def test_actions_after_game_over(self):
         g = play("greedy", storm="test", seed=0)
-        self.assertEqual(g.phase, "done")
+        self.assertEqual(g.phase, "over")
         before = g.score()
         for a in ({"type": "cut", "circuit": "C-01"}, {"type": "start_storm"},
                   {"type": "buy", "item": "protect", "target": "C-01"},
                   {"type": "emergency", "item": "generator", "target": "water-1"}):
-            self.assertFalse(g.apply(a)["ok"], a)
+            self.assertFalse(g.try_apply(a)["ok"], a)
         g.step()
         self.assertEqual(g.score(), before)
 
@@ -208,13 +224,13 @@ class TestFuzz(unittest.TestCase):
                 if g.event:
                     opt = rnd.choice(g.event["options"])["id"]
                     seen.add((g.event["kind"], opt))
-                    r = g.apply({"type": "choose", "event": g.event["id"], "option": opt})
+                    r = g.try_apply({"type": "choose", "event": g.event["id"], "option": opt})
                     self.assertTrue(r["ok"], (g.event, opt, r))
                     continue
                 if rnd.random() < 0.08:
-                    g.apply({"type": "cut", "circuit": rnd.choice([c.id for c in g.circuits])})
+                    g.try_apply({"type": "cut", "circuit": rnd.choice([c.id for c in g.circuits])})
                 elif rnd.random() < 0.05:
-                    g.apply({"type": "restore", "circuit": rnd.choice([c.id for c in g.circuits])})
+                    g.try_apply({"type": "restore", "circuit": rnd.choice([c.id for c in g.circuits])})
                 g.step()
         kinds = {k for k, _ in seen}
         for kind in ("critical_cut", "order_rise", "short", "cold"):
@@ -228,7 +244,7 @@ class TestFuzz(unittest.TestCase):
                   {"type": "buy", "item": "protect", "target": "hospital-1"},
                   {"type": "buy", "item": "conservation"},
                   {"type": "buy", "item": "repair_crews"}):
-            self.assertTrue(g.apply(a)["ok"], a)
+            self.assertTrue(g.try_apply(a)["ok"], a)
         self.assertEqual(g.points, 1)
         plan = g.plan()
         self.assertEqual(len(plan), 6)
@@ -240,14 +256,14 @@ class TestFuzz(unittest.TestCase):
     def test_prep_tips_and_state_in_prep(self):
         g = Game()
         s = g.state()
-        self.assertEqual(s["phase"], "prep")
+        self.assertEqual(s["phase"], "prepare")
         self.assertEqual(s["time"], "2021-02-12T12:00:00-06:00")
         self.assertEqual(s["order_mw"], 0)
         self.assertIsNone(s["event"])
         self.assertTrue(all(c["on"] for c in s["circuits"]))
         self.assertTrue(s["copilot"]["tip"])
-        self.assertFalse(g.apply({"type": "cut", "circuit": "C-01"})["ok"])
-        self.assertFalse(g.apply({"type": "emergency", "item": "generator", "target": "water-1"})["ok"])
+        self.assertFalse(g.try_apply({"type": "cut", "circuit": "C-01"})["ok"])
+        self.assertFalse(g.try_apply({"type": "emergency", "item": "generator", "target": "water-1"})["ok"])
         g.step()
         self.assertEqual(g.k, 0)
 
