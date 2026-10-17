@@ -1,7 +1,14 @@
+.env
+*.pem
+.DS_Store
 __pycache__/
 *.pyc
 .venv/
 .pytest_cache/
 node_modules/
+web/dist/
+ai/models/hf/
+*.gguf
+data/raw/
 data/*.zip
 data/large/

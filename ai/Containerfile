@@ -1,0 +1,25 @@
+# Training and batch jobs for IBM LinuxONE (s390x): M1 forecast (Granite TTM-R2 / XGBoost), M2 Snap ML.
+# libzdnn0 lets Snap ML use the z16/z17 on-chip AI accelerator (NNPA).
+# Build context is the repo root.
+FROM docker.io/library/ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
+# PyPI has no s390x wheels for numpy/pandas/scikit-learn/xgboost, so take Ubuntu's prebuilt ones.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 python3-venv python3-pip python3-numpy python3-pandas python3-sklearn \
+        python3-scipy python3-xgboost python3-psycopg ca-certificates libopenblas0 libgomp1 libpython3.12t64 libzdnn0 \
+    && rm -rf /var/lib/apt/lists/*
+RUN python3 -m venv --system-site-packages /venv
+ENV PATH=/venv/bin:$PATH
+
+# PyTorch publishes CPU wheels for s390x on its own index; granite-tsfm needs torch < 2.12.
+RUN pip install --no-cache-dir torch==2.11.0 --index-url https://download.pytorch.org/whl/cpu
+RUN pip install --no-cache-dir "transformers<6" einops deprecated snapml
+# granite-tsfm's declared deps pull pyarrow and a newer pandas, which have no s390x wheels and
+# aren't needed for TTM inference or fine-tuning here.
+RUN pip install --no-cache-dir --no-deps granite-tsfm
+COPY ai/stubs/datasets /venv/lib/python3.12/site-packages/datasets
+
+WORKDIR /app
+COPY . /app
+ENV PYTHONPATH=/app/engine:/app/server:/app/ai HF_HOME=/models/hf

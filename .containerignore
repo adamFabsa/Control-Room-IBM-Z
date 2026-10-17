@@ -1,0 +1,12 @@
+.git
+.env
+*.docx
+*.pem
+data
+hardware
+ai/models/hf
+*.gguf
+web/*
+!web/dist
+**/__pycache__
+**/node_modules

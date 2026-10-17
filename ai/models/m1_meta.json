@@ -1,0 +1,47 @@
+{
+  "features": [
+    "temp",
+    "temp_lag3",
+    "temp_lag6",
+    "temp_mean24",
+    "temp_mean72",
+    "temp_min24",
+    "hdd",
+    "hdd72",
+    "cdd",
+    "hour",
+    "dow",
+    "month",
+    "weekend"
+  ],
+  "linear_features": [
+    "hdd",
+    "hdd72",
+    "cdd"
+  ],
+  "linear": {
+    "intercept": 0.8433959024695104,
+    "coef": [
+      0.0038010159991020338,
+      0.003577986475347855,
+      0.025325821972111646
+    ]
+  },
+  "target": "demand / trailing 365-day mean demand = linear(linear_features) + xgb(features)",
+  "dallas_county_share": 0.09222605315058387,
+  "level_mw_2021": 43809.48533253921,
+  "metrics": {
+    "test": "winter days (Dec-Feb) from 2024-12-01, 180 days, 4296 hours",
+    "note": "M1 uses observed temperatures in place of a weather forecast; TTM sees only the past 512 hours of demand; EIA is the published day-ahead forecast",
+    "m1_weather_mape": 3.84,
+    "m1_dayahead_mape": 3.08,
+    "eia_dayahead_mape": 2.5,
+    "m1_weather_train_seconds": 0.8,
+    "train_hours": 47232,
+    "ttm_r2_zero_shot_mape": 5.7,
+    "ttm_inference": {
+      "forecasts": 158,
+      "seconds": 0.11
+    }
+  }
+}
