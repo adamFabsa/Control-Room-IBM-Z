@@ -2,7 +2,7 @@
 import asyncio
 import logging
 
-from . import analyst
+from . import analyst, m2
 from .engine import Game
 from .records import Records
 from .report import ReportJob
@@ -26,6 +26,7 @@ class GameSession:
             self.job.cancel()
         self.job = ReportJob()
         self.event_text = {}  # event id -> Granite's rewrite of the card
+        self.event_pick = {}  # event id -> M2's pick and predictions
         self.storm, self.seed = storm, seed
         self.game = Game(storm=storm, seed=seed)
         self.paused = True
@@ -40,8 +41,17 @@ class GameSession:
         s["paused"] = self.paused or s.get("event") is not None
         s["speed"] = self.speed
         self.records.add_totals(s)
-        if s.get("event") and self.event_text.get(s["event"]["id"]):
-            s["event"]["ai_text"] = self.event_text[s["event"]["id"]]
+        event = s.get("event")
+        if event and self.event_text.get(event["id"]):
+            event["ai_text"] = self.event_text[event["id"]]
+        if event and m2.get().available:
+            if event["id"] not in self.event_pick:
+                self.event_pick[event["id"]] = m2.get().pick_option(self.game, s)
+            pick = self.event_pick[event["id"]]
+            if pick:  # M2 replaces the engine's pick; each option carries M2's predictions
+                for option in event["options"]:
+                    option["ai_pick"] = option["id"] == pick["option"]
+                    option["m2"] = pick["predictions"].get(option["id"])
         return s
 
     def snapshot(self):

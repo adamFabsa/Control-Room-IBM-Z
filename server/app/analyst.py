@@ -23,7 +23,8 @@ TIP_PROMPT = (
 )
 EVENT_PROMPT = (
     "You write alerts for a power-grid control room during a winter storm. Rewrite this emergency as one or "
-    "two short, urgent sentences for the operator. Use only numbers and facts in the JSON. No lists."
+    "two short, urgent sentences for the operator. Use only the numbers and facts given. Reply with the "
+    "sentences only."
 )
 
 _lock = asyncio.Lock()  # llama-server runs one request at a time on 3 cores
@@ -58,8 +59,13 @@ def _chat(system, user, max_tokens):
                                      {"content-type": "application/json"})
     with urllib.request.urlopen(request, timeout=180) as r:
         reply = json.load(r)
-    text = reply["choices"][0]["message"]["content"].strip().strip('"').strip()
-    return text, reply.get("timings", {}).get("predicted_n", 0)
+    text = reply["choices"][0]["message"]["content"].strip()
+    if text.startswith("{"):  # the model sometimes answers in JSON; keep its first string
+        try:
+            text = next(v for v in json.loads(text).values() if isinstance(v, str))
+        except Exception:
+            pass
+    return text.strip().strip('"').strip(), reply.get("timings", {}).get("predicted_n", 0)
 
 
 async def write(system, facts, max_tokens=120, tries=2, required=()):
@@ -129,4 +135,5 @@ def summary_stats():
 
 
 def event_facts(event):
-    return {"title": event["title"], "text": event["text"], "options": [o["label"] for o in event["options"]]}
+    options = "; ".join(o["label"] for o in event["options"])
+    return f"{event['title']} {event['text']} Options: {options}."

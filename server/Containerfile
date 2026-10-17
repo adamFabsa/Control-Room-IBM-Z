@@ -2,9 +2,11 @@
 FROM docker.io/library/ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive PYTHONUNBUFFERED=1
-# PyPI has no s390x wheels for numpy/pandas, so take Ubuntu's prebuilt ones.
+# PyPI has no s390x wheels for numpy/pandas/scikit-learn, so take Ubuntu's prebuilt ones.
+# libzdnn0 lets Snap ML (M2) run on the on-chip AI accelerator (NNPA).
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 python3-venv python3-pip python3-numpy python3-pandas python3-psycopg \
+        python3-sklearn python3-scipy libpython3.12t64 libzdnn0 \
     && rm -rf /var/lib/apt/lists/*
 RUN python3 -m venv --system-site-packages /venv
 ENV PATH=/venv/bin:$PATH

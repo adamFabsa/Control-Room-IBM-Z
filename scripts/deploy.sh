@@ -13,4 +13,7 @@ rsync -az --delete -e "ssh -i $SSH_KEY" \
   ./ "$VM_USER@$VM_HOST:$REMOTE_DIR/"
 ssh -i "$SSH_KEY" "$VM_USER@$VM_HOST" "cd $REMOTE_DIR \
   && { [ -f .env ] || echo POSTGRES_PASSWORD=\$(openssl rand -hex 16) > .env; } \
-  && podman-compose up -d --build server db && podman ps"
+  && podman-compose up -d --build server db >/tmp/deploy.log 2>&1 \
+  && podman ps --format '{{.Names}} {{.Status}}'"
+# podman-compose echoes each container's full command, environment secrets included, so its output
+# stays on the VM in /tmp/deploy.log.

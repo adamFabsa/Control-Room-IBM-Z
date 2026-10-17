@@ -7,7 +7,7 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 
 from .engine import Game
-from .players import PLAYERS, play_out
+from .players import PLAYERS, play_out, player
 
 DECISIONS = {"buy", "cut", "restore", "emergency", "choose"}
 MAX_REPLAYS = 150
@@ -116,7 +116,7 @@ def run_storm(seed, plan, operator, with_baseline):
             game.apply(action)
         except Exception:
             pass
-    decide = PLAYERS[operator]
+    decide = player(operator)
     game, _ = play_out(game, lambda s: [] if s["phase"] == "prepare" else decide(s))
     baseline = None
     if with_baseline:

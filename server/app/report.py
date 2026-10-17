@@ -9,13 +9,11 @@ from functools import lru_cache
 
 from . import analyst, jobs
 from .engine import Game
-from .players import PLAYERS, play_out
+from .players import ai_player_name, play_out, player
 
 log = logging.getLogger("controlroom.report")
 
 STEPS_PER_HOUR = 12
-AI_ALONE_PLAYER = "greedy"  # replaced by the M2 what-if player once it is trained
-STRESS_OPERATOR = "greedy"
 _stress_baselines = {}  # playbook_2021 cold person-hours by generated-storm seed, shared by every stress test
 
 
@@ -27,8 +25,8 @@ def _hourly(history):
 def baselines(storm, seed):
     """Scores and hourly cold-homes curves for the two built-in players; same for every player."""
     out = {}
-    for name, player in (("real_2021", "playbook_2021"), ("ai_alone", AI_ALONE_PLAYER)):
-        game, history = play_out(Game(storm=storm, seed=seed), PLAYERS[player])
+    for name, who in (("real_2021", "playbook_2021"), ("ai_alone", ai_player_name())):
+        game, history = play_out(Game(storm=storm, seed=seed), player(who))
         out[name] = {"score": game.score(), "hourly": _hourly(history)}
     return out
 
@@ -64,7 +62,7 @@ class ReportJob:
                 if tip:
                     self.summary, self.summary_source = f"{self.summary} {tip}", "granite"
             plan = [e["action"] for e in snap["log"] if e["action"]["type"] == "buy"]
-            await jobs.stress_test(plan, STRESS_OPERATOR, self.stress, _stress_baselines)
+            await jobs.stress_test(plan, ai_player_name(), self.stress, _stress_baselines)
         except asyncio.CancelledError:
             raise
         except Exception:
@@ -89,7 +87,7 @@ def build_report(snapshot, base, job):
             "real_2021": [h["people_cold"] for h in axis],
             "ai_alone": [h["people_cold"] for h in base["ai_alone"]["hourly"]],
         },
-        "ai_alone_player": AI_ALONE_PLAYER,
+        "ai_alone_player": ai_player_name(),
         "winter_plan": [e["action"] for e in snapshot["log"] if e["action"]["type"] == "buy"],
         "turning_points": job.turning_points or [],
         "turning_points_run": job.turning_points_run,

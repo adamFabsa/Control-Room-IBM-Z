@@ -11,7 +11,7 @@ from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import analyst
+from . import analyst, m2
 from .engine import ENGINE_NAME
 from .report import baselines, build_report
 from .session import GameSession
@@ -68,6 +68,8 @@ def get_ai():
     job = session.job
     return {"platform": _cpu(),
             "m1_forecast": json.loads(m1.read_text())["metrics"] if m1.exists() else None,
+            "m2_what_if": ({**m2.get().meta["metrics"], "server_inference": m2.get().accelerator}
+                           if m2.get().available else None),
             "m3_analyst": analyst.summary_stats(),
             "records": session.records.stats(),
             "last_report": {"turning_points": job.turning_points_run,

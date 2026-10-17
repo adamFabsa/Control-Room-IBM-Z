@@ -44,6 +44,19 @@ def greedy(state):
 PLAYERS = {"playbook_2021": playbook_2021, "greedy": greedy}
 
 
+def player(name):
+    """A player by name; "m2" is the AI that picks moves with the M2 what-if model."""
+    if name == "m2":
+        from . import m2
+        return m2.get().player()
+    return PLAYERS[name]
+
+
+def ai_player_name():
+    from . import m2
+    return "m2" if m2.get().available else "greedy"
+
+
 def play_out(game, decide, max_steps=10_000):
     """Plays `game` to the end with `decide`; event cards take the AI pick. Returns (game, history)."""
     history = []

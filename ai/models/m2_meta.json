@@ -1,0 +1,21 @@
+{
+  "features": 154,
+  "horizon_steps": 72,
+  "metrics": {
+    "samples": 6278,
+    "games": 500,
+    "engine": "stub",
+    "generate_seconds": 19.1,
+    "train_seconds": 2.7,
+    "cph_r2": 0.989,
+    "cph_mae": 23736,
+    "helps_or_hurts_accuracy": 1.0,
+    "dark_accuracy": 1.0,
+    "dark_auc": 1.0,
+    "ms_per_prediction_cpu": 0.242,
+    "ms_per_15_moves_cpu": 0.279,
+    "ms_per_prediction_nnpa": 0.1,
+    "ms_per_15_moves_nnpa": 0.168,
+    "nnpa_matches_cpu": true
+  }
+}

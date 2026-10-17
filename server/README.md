@@ -35,7 +35,7 @@ A bad action sent over the WebSocket gets `{"error": "..."}` back to that client
   "storm": "uri2021", "seed": 42, "phase": "over",
   "scores": {"you": {...score()...}, "real_2021": {...}, "ai_alone": {...}},
   "chart": {"time": ["2021-02-14T18:55:00-06:00", "..."], "you": [0, 38900], "real_2021": [...], "ai_alone": [...]},
-  "ai_alone_player": "greedy",
+  "ai_alone_player": "m2",
   "winter_plan": [{"type": "buy", "item": "generator", "target": "water-1"}],
   "turning_points": [],
   "summary": null,
@@ -45,7 +45,7 @@ A bad action sent over the WebSocket gets `{"error": "..."}` back to that client
 
 `chart` is hourly people in cold homes. When the storm ends the server fills in, in order: `turning_points` (the 3 decisions whose removal changes cold person-hours most; `cold_person_hours_change` > 0 means the decision saved that many), `summary` (the facts as computed sentences, then Granite's one-sentence coaching tip appended once it passes the number check; `summary_source` is `pending`, `template` or `granite`), then `stress_test` (`status` `running` with `done`/`storms`, then `wins`, `win_pct`, `worst`). Re-fetch the report every few seconds until `stress_test.status` is `done`.
 
-While an event card is open, `event.ai_text` appears once Granite has rewritten the card (about 15 s); show the engine's `text` until then.
+On an open event card, M2 (the Snap ML what-if model) sets `ai_pick` and adds `m2: {cold_person_hours_change, critical_dark_chance}` to each option. While an event card is open, `event.ai_text` appears once Granite has rewritten the card (about 15 s); show the engine's `text` until then.
 
 ## Engine
 
