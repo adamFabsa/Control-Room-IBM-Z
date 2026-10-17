@@ -1,13 +1,17 @@
-"""Downloads the M1 forecast data once: ERCOT hourly demand (EIA-930) and Texas city temperatures (Open-Meteo).
+"""Downloads the data once: ERCOT hourly demand (EIA-930), Texas city temperatures (Open-Meteo), and
+Dallas County outages during Uri (EAGLE-I).
 
-    python3 ai/data/fetch_data.py      # on the LinuxONE VM, from ~/control-room
+    python3 ai/data/fetch_data.py            # on the LinuxONE VM, from ~/control-room
+    python3 ai/data/fetch_data.py eaglei     # only the EAGLE-I step
 
-Writes data/eia930_ercot_hourly.csv (UTC, hour ending) and data/openmeteo_texas_hourly.csv (UTC).
+Writes data/eia930_ercot_hourly.csv (UTC, hour ending), data/openmeteo_texas_hourly.csv (UTC) and
+data/eaglei_dallas_feb2021.csv (15-minute customers out, explicit UTC offsets; read by the engine).
 Standard library only. Uses EIA's bulk six-month files: the EIA API was timing out.
 """
 import csv
 import io
 import json
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -22,6 +26,12 @@ EIA_FIRST_YEAR = 2019
 CITIES = {"dallas": (32.78, -96.80), "houston": (29.76, -95.37),
           "san_antonio": (29.42, -98.49), "austin": (30.27, -97.74)}
 WEATHER_START = "2005-01-01"
+# EAGLE-I recorded outages (ORNL), figshare article 24237376
+EAGLEI_2021 = "https://ndownloader.figshare.com/files/42547891"
+EAGLEI_MCC = "https://ndownloader.figshare.com/files/42547708"  # modeled customer counts per county
+DALLAS_FIPS = "48113"
+EAGLEI_WINDOW = ("2021-02-10", "2021-02-25")
+EAGLEI_TZ = "+00:00"  # run_start_time is UTC: Dallas outages jump at 07:45 UTC = 01:45 CST, after the 01:20 order
 
 
 def get_json(url, tries=4):
@@ -98,7 +108,38 @@ def fetch_weather():
     print(f"wrote {out}")
 
 
+def fetch_eaglei():
+    """Dallas County rows of the 1.1 GB 2021 EAGLE-I file for Uri's window, streamed, plus its customer count."""
+    def lines(url):
+        request = urllib.request.Request(url, headers={"User-Agent": "controlroom-datathon/1.0"})
+        return io.TextIOWrapper(urllib.request.urlopen(request, timeout=300), encoding="utf-8-sig")
+
+    mcc = csv.DictReader(lines(EAGLEI_MCC))
+    total = next((r for r in mcc if r[next(k for k in r if "fips" in k.lower())].zfill(5) == DALLAS_FIPS), None)
+    total = total and int(float(next(v for k, v in total.items() if "customer" in k.lower())))
+    rows = []
+    reader = lines(EAGLEI_2021)
+    header = next(csv.reader([next(reader)]))
+    col = {name: i for i, name in enumerate(header)}
+    for line in reader:
+        if not line.startswith((DALLAS_FIPS + ",", '"' + DALLAS_FIPS)):
+            continue
+        f = next(csv.reader([line]))
+        if EAGLEI_WINDOW[0] <= f[col["run_start_time"]] < EAGLEI_WINDOW[1]:
+            rows.append((f[col["run_start_time"]].replace(" ", "T") + EAGLEI_TZ, f[col["county"]], int(float(f[col["customers_out"]]))))
+    out = DATA / "eaglei_dallas_feb2021.csv"
+    with out.open("w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["run_start_time", "county", "customers_out", "total_customers"])
+        w.writerows((t, county, n, total or "") for t, county, n in sorted(rows))
+    print(f"wrote {out} ({len(rows)} rows; Dallas County customers {total})")
+
+
 if __name__ == "__main__":
     DATA.mkdir(exist_ok=True)
-    fetch_eia()
-    fetch_weather()
+    if sys.argv[1:] == ["eaglei"]:
+        fetch_eaglei()
+    else:
+        fetch_eia()
+        fetch_weather()
+        fetch_eaglei()
