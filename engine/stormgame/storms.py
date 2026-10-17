@@ -46,6 +46,12 @@ class Storm:
     order_mw: np.ndarray    # base cut order, same length
     note: str = ""
 
+    def __post_init__(self):
+        if len(self.outside_f) != len(self.order_mw) or len(self.outside_f) < 2:
+            raise ValueError("storm curves must be the same length, at least 2 steps")
+        if not (np.isfinite(self.outside_f).all() and np.isfinite(self.order_mw).all()):
+            raise ValueError(f"storm {self.name} has non-finite values")
+
     @property
     def n_steps(self):
         return len(self.outside_f) - 1
@@ -210,7 +216,7 @@ def _synthetic_hourly(rng):
     low = rng.uniform(-4, 22)
     amp = rng.uniform(4, 9)
     h = np.arange(length + 1, dtype=float)
-    envelope = np.sin(np.pi * h / length) ** 0.6
+    envelope = np.clip(np.sin(np.pi * h / length), 0, 1) ** 0.6
     diurnal = -amp * np.cos(2 * np.pi * (h - 12) / 24)        # coldest around 06:00
     noise = np.convolve(rng.normal(0, 2, len(h)), np.ones(5) / 5, mode="same")
     return 34 - (34 - low) * envelope + diurnal * envelope + noise

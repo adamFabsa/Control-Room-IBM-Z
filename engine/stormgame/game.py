@@ -100,6 +100,8 @@ class Game:
 
     def _targets(self, target):
         """Circuits named by a circuit id, a split circuit's original id, or a building id."""
+        if not isinstance(target, str):
+            raise ValueError(f"unknown circuit or building {target!r}")
         if target in self._cmap:
             return [self._cmap[target]]
         if target in self._bmap:
@@ -172,7 +174,11 @@ class Game:
 
     def apply(self, action):
         """Apply one action JSON. Returns {"ok": True, ...} or {"ok": False, "error": ...}."""
+        if not isinstance(action, dict):
+            return {"ok": False, "error": "an action must be a JSON object"}
         kind = action.get("type")
+        if not isinstance(kind, str):
+            return {"ok": False, "error": "an action needs a type"}
         k, phase = self.k, self.phase
         event_kind = self.event["kind"] if self.event else None
         try:
@@ -199,8 +205,10 @@ class Game:
         self.paused = False
 
     def _act_speed(self, a):
-        value = int(a.get("value", 1))
-        if not 1 <= value <= 5:
+        value = a.get("value", 1)
+        if isinstance(value, str) and value.isdigit():
+            value = int(value)
+        if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5:
             raise ValueError("speed must be 1-5")
         self.speed = value
 
@@ -233,7 +241,7 @@ class Game:
 
     def _act_buy(self, a):
         item = a.get("item")
-        if item not in C.COSTS:
+        if not isinstance(item, str) or item not in C.COSTS:
             raise ValueError(f"unknown item {item!r}")
         if self.phase == "storm":
             if item not in C.STORM_ITEMS:
@@ -247,7 +255,7 @@ class Game:
         item = a.get("item")
         if self.phase != "storm":
             raise ValueError("emergency moves are for the storm")
-        if item not in C.STORM_ITEMS:
+        if not isinstance(item, str) or item not in C.STORM_ITEMS:
             raise ValueError(f"{item} is not an emergency item")
         self._buy(item, a.get("target"))
 
@@ -261,7 +269,7 @@ class Game:
             for c in circuits:
                 c.protected = True
         elif item == "generator":
-            b = self._bmap.get(target)
+            b = self._bmap.get(target) if isinstance(target, str) else None
             if b is None:
                 raise ValueError("a generator goes on a building")
             self._give_generator(b)
@@ -298,11 +306,11 @@ class Game:
         b.fuel_warned = False
 
     def _split(self, target):
-        c = self._cmap.get(target)
+        c = self._cmap.get(target) if isinstance(target, str) else None
         if c is None or c.parent is not None:
             raise ValueError(f"{target!r} is not a circuit that can be split")
         self._spend("smart_switch")
-        half_people, half_mw = c.people // 2, c.mw / 2
+        half_people, half_mw = c.people // 2, c.mw // 2
         a = Circuit(f"{c.id}A", c.area, c.people - half_people, c.mw - half_mw, c.vuln, parent=c.id)
         b = Circuit(f"{c.id}B", c.area, half_people, half_mw, c.vuln, parent=c.id)
         a.protected = b.protected = c.protected
@@ -339,7 +347,7 @@ class Game:
         if ev is None or a.get("event") != ev["id"]:
             raise ValueError("no such open event")
         option = a.get("option")
-        if option not in [o["id"] for o in ev["options"]]:
+        if not isinstance(option, str) or option not in [o["id"] for o in ev["options"]]:
             raise ValueError(f"no option {option!r}")
         self._resolve(ev, option)
         if self.event is ev:
@@ -490,7 +498,10 @@ class Game:
                     return self._open_cold(c, mins)
 
     def _open(self, kind, title, text, options, data):
-        """options: list of (id, label) pairs. The last one is the do-nothing default."""
+        """options: list of (id, label) pairs. The last one is the do-nothing default.
+        A card with nothing to decide (one option) is not opened."""
+        if len(options) < 2:
+            return
         self._event_n += 1
         ev = {
             "id": f"ev-{self._event_n}",
@@ -509,7 +520,7 @@ class Game:
         self.event = ev
 
     _PICK_ORDER = {
-        "critical_cut": ["gen", "other", "dark"],
+        "critical_cut": ["gen", "other", "cancel", "dark"],
         "ice": ["gen", "dark"],
         "fuel": ["gen", "restore", "dark"],
         "order_rise": ["auto"],
@@ -541,6 +552,8 @@ class Game:
         options = self._gen_option()
         if alt is not None:
             options.append(("other", "Cut a different neighborhood"))
+        if len(options) < 2:
+            options.append(("cancel", f"Keep {c.id} on"))
         options.append(("dark", f"Let the {b.name} go dark"))
         self._open("critical_cut", f"The {b.name} is about to lose power.", text, options,
                    {"targets": [x.id for x in circuits], "building": b.id, "alternative": alt and alt.id})

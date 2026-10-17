@@ -6,7 +6,7 @@ Plain Python 3.11 + NumPy + pandas. No screen, no server, no network calls. The 
 pip install -r requirements.txt
 python run_cli.py                  # playbook_2021 vs greedy on Uri, with timing
 python run_cli.py --interactive    # play from the terminal
-python -m unittest discover tests
+python -m unittest discover tests      # FUZZ_SEEDS=20 for a longer random-play run
 ```
 
 ## API (Shared contract 1)
@@ -50,14 +50,15 @@ Additions beyond the contract. Each is a new key or function, and nothing in the
 
 | kind | fires when | options |
 |---|---|---|
-| `critical_cut` | the player cuts a circuit with an exposed critical building | `gen`, `other`, `dark` |
+| `critical_cut` | the player cuts a circuit with an exposed critical building | `gen`, `other`, `dark` (`cancel` = keep it on, when gen/other are unavailable) |
 | `ice` | an ice break will darken an exposed critical building within 15 min | `gen`, `dark` |
 | `fuel` | a generator runs dry within 15 min | `gen`, `restore`, `dark` |
 | `order_rise` | order up more than 200 MW in an hour | `auto`, `conserve`, `manual` |
 | `short` | more than 5% short for 15 min | `auto`, `conserve`, `wait` |
 | `cold` | a dark circuit's homes cross 50°F within 60 min | `restore`, `warm`, `keep` |
 
-  `auto` cuts the warmest circuits that darken no critical building. Cooldowns: order_rise and short 60 min, cold 30 min.
+  Options that cost points appear only when the player can afford them, and a card with only one possible answer is not shown, so every card has 2–3 options. `auto` cuts the warmest circuits that darken no critical building. Cooldowns: order_rise and short 60 min, cold 30 min.
+- **Bad input** (unknown types, wrong field types, non-objects) never raises: `apply` returns `{"ok": false, "error": ...}`.
 - **playbook_2021** protects the hospital, cuts in fixed order C-01→C-15, and rotates a circuit back on after 240 minutes dark.
 - **greedy** spends no points; every step it keeps the warmest circuits cut and the coldest on.
 
