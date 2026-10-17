@@ -17,8 +17,8 @@ NUMBER = re.compile(r"\d[\d,]*(?:\.\d+)?")
 
 TIP_PROMPT = (
     "You coach operators in a winter-storm power-grid training game. Write one short sentence of advice for "
-    "the player's next storm, based on their biggest turning point. If the decision cost cold person-hours, "
-    "advise against repeating it; if it saved them, advise doing it again. If you use a number, write it exactly "
+    "the player's next storm, based on their biggest turning point. If the decision cost cold person-hours or "
+    "led to a collapse, advise against repeating it; if it saved them or kept the grid up, advise doing it again. If you use a number, write it exactly "
     "as given. Reply with the sentence only."
 )
 EVENT_PROMPT = (
@@ -112,19 +112,24 @@ def template_summary(scores, turning_points):
             f"({_versus(real['cold_person_hours'], mine)}) and the AI playing alone had {ai['cold_person_hours']:,} "
             f"({_versus(ai['cold_person_hours'], mine)}). Your longest outage lasted {you['longest_outage_min']:,} "
             f"minutes and critical buildings were dark for {you['critical_dark_min']:,} minutes in total.")
+    if you.get("grid_collapsed"):
+        text = "The grid collapsed and the game ended early. " + text
     if turning_points:
-        top = turning_points[0]
-        change = top["cold_person_hours_change"]
-        text += (f" Your biggest turning point was {top['label']}, which {'saved' if change > 0 else 'cost'} "
-                 f"{abs(change):,} cold person-hours.")
+        text += f" Your biggest turning point was {turning_points[0]['label']}, which {_effect(turning_points[0])}."
     return text
 
 
+def _effect(tp):
+    if tp.get("grid_collapsed_without") and not tp.get("grid_collapsed"):
+        return "kept the grid from collapsing"
+    if tp.get("grid_collapsed") and not tp.get("grid_collapsed_without"):
+        return "led to the grid collapse"
+    change = tp["cold_person_hours_change"]
+    return f"{'saved' if change > 0 else 'cost'} {abs(change):,} cold person-hours"
+
+
 def tip_facts(turning_points):
-    top = turning_points[0]
-    change = top["cold_person_hours_change"]
-    return (f"Biggest turning point: {top['label']}. It {'saved' if change > 0 else 'cost'} "
-            f"{abs(change):,} cold person-hours.")
+    return f"Biggest turning point: {turning_points[0]['label']}. It {_effect(turning_points[0])}."
 
 
 def summary_stats():

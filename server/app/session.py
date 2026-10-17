@@ -79,9 +79,11 @@ class GameSession:
         elif kind == "new_game":
             self.new_game(action.get("storm", "uri2021"), int(action.get("seed", 42)))
         else:
-            event = self.game.state().get("event") if kind == "choose" else None
+            before = self.game.state()
+            event = before.get("event") if kind == "choose" else None
             self.game.apply(action)
-            entry = {"step": self.steps, "action": action}
+            # the engine's own step counter when it has one, so replays line up exactly
+            entry = {"step": before.get("step", self.steps), "action": action}
             if event:  # for turning-point labels
                 entry["option_label"] = next((o["label"] for o in event["options"] if o["id"] == action.get("option")), None)
             self.log.append(entry)

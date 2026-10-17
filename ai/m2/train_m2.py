@@ -4,7 +4,7 @@
 
 Each sample: a random but plausible game paused at a random moment, a proposed move, and two clones of the
 game played 6 hours ahead (with and without the move, then holding still). Labels: the change in cold
-person-hours, and whether the move left a critical building dark that otherwise wasn't.
+person-hours (a grid collapse counts as a big loss), and whether the move left a critical building dark.
 Writes ai/models/m2_cph.pkl, m2_dark.pkl, m2_meta.json.
 """
 import json
@@ -20,7 +20,7 @@ from snapml import SnapBoostingMachineClassifier, SnapBoostingMachineRegressor
 from sklearn.metrics import accuracy_score, mean_absolute_error, r2_score, roc_auc_score
 
 from app.engine import ENGINE_NAME, Game
-from app.m2 import BUILDINGS, HORIZON_STEPS, move_vector
+from app.m2 import BUILDINGS, HORIZON_STEPS, effective_cph, move_vector
 
 GAMES = int(os.environ.get("M2_GAMES", 500))
 SAMPLES_PER_GAME = 12
@@ -82,7 +82,7 @@ def what_if(game, state, move):
         return None
     x = move_vector(state, with_move.state())
     a, b = hold(with_move, HORIZON_STEPS), hold(without, HORIZON_STEPS)
-    return x, a["cold_person_hours"] - b["cold_person_hours"], int(a["critical_dark_min"] > b["critical_dark_min"])
+    return x, effective_cph(a) - effective_cph(b), int(a["critical_dark_min"] > b["critical_dark_min"])
 
 
 def one_game(seed):

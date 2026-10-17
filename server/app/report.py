@@ -9,7 +9,7 @@ from functools import lru_cache
 
 from . import analyst, jobs
 from .engine import Game
-from .players import ai_player_name, play_out, player
+from .players import ai_player_name, play_out, player, run_official
 
 log = logging.getLogger("controlroom.report")
 
@@ -25,9 +25,14 @@ def _hourly(history):
 def baselines(storm, seed):
     """Scores and hourly cold-homes curves for the two built-in players; same for every player."""
     out = {}
-    for name, who in (("real_2021", "playbook_2021"), ("ai_alone", ai_player_name())):
-        game, history = play_out(Game(storm=storm, seed=seed), player(who))
-        out[name] = {"score": game.score(), "hourly": _hourly(history)}
+    official = run_official("playbook_2021", storm, seed)
+    if official:
+        out["real_2021"] = {"score": official[0], "hourly": official[1]}
+    else:
+        game, history = play_out(Game(storm=storm, seed=seed), player("playbook_2021"))
+        out["real_2021"] = {"score": game.score(), "hourly": _hourly(history)}
+    game, history = play_out(Game(storm=storm, seed=seed), player(ai_player_name()))
+    out["ai_alone"] = {"score": game.score(), "hourly": _hourly(history)}
     return out
 
 

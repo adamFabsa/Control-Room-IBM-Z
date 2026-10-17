@@ -20,6 +20,11 @@ CIRCUITS = [f"C-{i:02d}" for i in range(1, 16)]
 BUILDINGS = ["hospital-1", "dialysis-1", "water-1", "gas-1", "school-1"]
 HORIZON_STEPS = 72  # 6 game hours
 CRITICAL_PENALTY = 2_000_000  # cold person-hours we'd trade to keep a critical building powered
+COLLAPSE_COST = 20_000_000  # a collapsed grid ends the game early, so its low cold-hours must count as a loss
+
+
+def effective_cph(score):
+    return score["cold_person_hours"] + (COLLAPSE_COST if score.get("grid_collapsed") else 0)
 AI_PREP = [("protect", "hospital-1"), ("generator", "water-1"), ("keep_gas", "gas-1"),
            ("warming_center", "school-1"), ("warming_center", "school-1")]  # 7 of 10 points; 3 left for emergencies
 MODELS = Path(__file__).resolve().parents[2] / "ai" / "models"

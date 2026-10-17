@@ -52,6 +52,16 @@ def player(name):
     return PLAYERS[name]
 
 
+def run_official(name, storm, seed, plan=None):
+    """(score, hourly people_cold) from the engine's own built-in player, or None with the stand-in engine."""
+    from .engine import ENGINE_NAME
+    if ENGINE_NAME != "stormgame":
+        return None
+    from stormgame import play
+    g = play(name, storm=storm, seed=seed, plan=plan)
+    return g.score(), [{"time": t["time"], "people_cold": t["people_cold"]} for t in g.timeline[1:]]
+
+
 def ai_player_name():
     from . import m2
     return "m2" if m2.get().available else "greedy"

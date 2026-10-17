@@ -1,4 +1,7 @@
-"""Batch jobs spread over LinuxONE's cores: turning-point replays and the 1,000-storm stress test."""
+"""Batch jobs spread over LinuxONE's cores: turning-point replays and the 1,000-storm stress test.
+
+Cold person-hours here count a grid collapse as a loss (m2.effective_cph): a collapsed game ends early.
+"""
 import asyncio
 import multiprocessing
 import os
@@ -7,7 +10,8 @@ from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 
 from .engine import Game
-from .players import PLAYERS, play_out, player
+from .m2 import effective_cph
+from .players import PLAYERS, play_out, player, run_official
 
 DECISIONS = {"buy", "cut", "restore", "emergency", "choose"}
 MAX_REPLAYS = 150
@@ -100,10 +104,12 @@ async def turning_points(storm, seed, log, score, history, top=3):
     scores = await asyncio.gather(*(loop.run_in_executor(pool(), replay, storm, seed, log, i) for i in candidates))
     seconds = time.perf_counter() - start
     actual = score["cold_person_hours"]
-    ranked = sorted(zip(candidates, scores), key=lambda p: -abs(p[1]["cold_person_hours"] - actual))
+    ranked = sorted(zip(candidates, scores), key=lambda p: -abs(effective_cph(p[1]) - effective_cph(score)))
     points = [{"rank": rank + 1, "step": log[i]["step"], "action": log[i]["action"], "label": label(log[i], history),
                "cold_person_hours_without": s["cold_person_hours"],
-               "cold_person_hours_change": s["cold_person_hours"] - actual}
+               "cold_person_hours_change": s["cold_person_hours"] - actual,
+               "grid_collapsed_without": bool(s.get("grid_collapsed")),
+               "grid_collapsed": bool(score.get("grid_collapsed"))}
               for rank, (i, s) in enumerate(ranked[:top])]
     return points, {"replays": len(candidates), "seconds": round(seconds, 2), "cores": os.cpu_count()}
 
@@ -120,9 +126,12 @@ def run_storm(seed, plan, operator, with_baseline):
     game, _ = play_out(game, lambda s: [] if s["phase"] == "prepare" else decide(s))
     baseline = None
     if with_baseline:
-        baseline, _ = play_out(Game(storm="generated", seed=seed), PLAYERS["playbook_2021"])
-        baseline = baseline.score()["cold_person_hours"]
-    return seed, game.score()["cold_person_hours"], baseline
+        official = run_official("playbook_2021", "generated", seed)
+        if official:
+            baseline = effective_cph(official[0])
+        else:
+            baseline = effective_cph(play_out(Game(storm="generated", seed=seed), PLAYERS["playbook_2021"])[0].score())
+    return seed, effective_cph(game.score()), baseline, bool(game.score().get("grid_collapsed"))
 
 
 async def stress_test(plan, operator, status, baselines):
@@ -133,9 +142,10 @@ async def stress_test(plan, operator, status, baselines):
     start = time.perf_counter()
     futures = [loop.run_in_executor(pool(), run_storm, seed, plan, operator, seed not in baselines)
                for seed in range(1, STRESS_STORMS + 1)]
-    wins, worst = 0, None
+    wins, collapses, worst = 0, 0, None
     for future in asyncio.as_completed(futures):
-        seed, cph, baseline = await future
+        seed, cph, baseline, collapsed = await future
+        collapses += collapsed
         if baseline is not None:
             baselines[seed] = baseline
         baseline = baselines[seed]
@@ -144,5 +154,6 @@ async def stress_test(plan, operator, status, baselines):
             worst = {"seed": seed, "cold_person_hours": cph, "playbook_cold_person_hours": baseline}
         status["done"] += 1
         status["wins"] = wins
+        status["collapses"] = collapses
     status.update({"status": "done", "win_pct": round(100 * wins / STRESS_STORMS, 1), "worst": worst,
                    "seconds": round(time.perf_counter() - start, 1)})

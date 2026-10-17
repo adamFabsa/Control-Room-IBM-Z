@@ -2,7 +2,9 @@
 .env
 *.docx
 *.pem
-data
+data/raw
+data/large
+data/*.zip
 hardware
 ai/models/hf
 *.gguf
