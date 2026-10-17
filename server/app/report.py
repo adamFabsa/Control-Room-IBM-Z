@@ -59,19 +59,21 @@ class ReportJob:
             scores = {"you": snap["score"], "real_2021": base["real_2021"]["score"], "ai_alone": base["ai_alone"]["score"]}
             self.turning_points, self.turning_points_run = await jobs.turning_points(
                 snap["storm"], snap["seed"], snap["log"], snap["score"], snap["history"])
-            # Facts come from the template; Granite adds one coaching sentence (a 2B model flipped comparisons
-            # when asked to write the facts itself).
             self.summary, self.summary_source = analyst.template_summary(scores, self.turning_points), "template"
-            if self.turning_points:
-                tip = await analyst.write(analyst.TIP_PROMPT, analyst.tip_facts(self.turning_points), 60)
-                if tip:
-                    self.summary, self.summary_source = f"{self.summary} {tip}", "granite"
             plan = [e["action"] for e in snap["log"] if e["action"]["type"] == "buy"]
-            await jobs.stress_test(plan, ai_player_name(), self.stress, _stress_baselines)
+            await asyncio.gather(self._coach(), jobs.stress_test(plan, ai_player_name(), self.stress, _stress_baselines))
         except asyncio.CancelledError:
             raise
         except Exception:
             log.exception("report job failed")
+
+    async def _coach(self):
+        # Facts come from the template; Granite adds one coaching sentence (a 2B model flipped comparisons
+        # when asked to write the facts itself).
+        if self.turning_points:
+            tip = await analyst.write(analyst.TIP_PROMPT, analyst.tip_facts(self.turning_points), 60)
+            if tip:
+                self.summary, self.summary_source = f"{self.summary} {tip}", "granite"
 
 
 def build_report(snapshot, base, job):

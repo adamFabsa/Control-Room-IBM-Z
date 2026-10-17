@@ -59,7 +59,8 @@ def run_official(name, storm, seed, plan=None):
         return None
     from stormgame import play
     g = play(name, storm=storm, seed=seed, plan=plan)
-    return g.score(), [{"time": t["time"], "people_cold": t["people_cold"]} for t in g.timeline[1:]]
+    hours = g.state()["steps_total"] // 12  # timeline[0] is the storm's start; keep one entry per storm hour
+    return g.score(), [{"time": t["time"], "people_cold": t["people_cold"]} for t in g.timeline[1:hours + 1]]
 
 
 def ai_player_name():

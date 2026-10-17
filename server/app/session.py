@@ -103,7 +103,9 @@ class GameSession:
             await self.broadcast()
 
     async def _write_event(self, event):
-        text = await analyst.write(analyst.EVENT_PROMPT, analyst.event_facts(event), max_tokens=60)
+        still_open = lambda: (self.game.state().get("event") or {}).get("id") == event["id"]
+        text = await analyst.write(analyst.EVENT_PROMPT, analyst.event_facts(event), max_tokens=60,
+                                   still_wanted=still_open)
         if text:
             self.event_text[event["id"]] = text
             await self.broadcast()

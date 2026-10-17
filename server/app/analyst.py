@@ -68,13 +68,18 @@ def _chat(system, user, max_tokens):
     return text.strip().strip('"').strip(), reply.get("timings", {}).get("predicted_n", 0)
 
 
-async def write(system, facts, max_tokens=120, tries=2, required=()):
-    """Granite text that passes the number check and contains every `required` phrase, or None."""
+async def write(system, facts, max_tokens=120, tries=2, required=(), still_wanted=None):
+    """Granite text that passes the number check and contains every `required` phrase, or None.
+
+    still_wanted() is checked once the model is free, so stale requests (a closed event card) are dropped.
+    """
     if not LLM_URL:
         return None
     user = facts if isinstance(facts, str) else json.dumps(facts)
     for _ in range(tries):
         async with _lock:
+            if still_wanted and not still_wanted():
+                return None
             start = time.perf_counter()
             try:
                 text, tokens = await asyncio.to_thread(_chat, system, user, max_tokens)
