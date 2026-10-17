@@ -2,8 +2,10 @@
 import asyncio
 import logging
 
+from . import analyst
 from .engine import Game
 from .records import Records
+from .report import ReportJob
 
 log = logging.getLogger("controlroom")
 
@@ -20,6 +22,10 @@ class GameSession:
         self.new_game()
 
     def new_game(self, storm="uri2021", seed=42):
+        if getattr(self, "job", None):
+            self.job.cancel()
+        self.job = ReportJob()
+        self.event_text = {}  # event id -> Granite's rewrite of the card
         self.storm, self.seed = storm, seed
         self.game = Game(storm=storm, seed=seed)
         self.paused = True
@@ -34,7 +40,18 @@ class GameSession:
         s["paused"] = self.paused or s.get("event") is not None
         s["speed"] = self.speed
         self.records.add_totals(s)
+        if s.get("event") and self.event_text.get(s["event"]["id"]):
+            s["event"]["ai_text"] = self.event_text[s["event"]["id"]]
         return s
+
+    def snapshot(self):
+        """A consistent copy of the finished (or current) game for the report."""
+        return {"storm": self.storm, "seed": self.seed, "phase": self.game.state()["phase"],
+                "score": self.game.score(), "history": list(self.history), "log": list(self.log)}
+
+    def finish(self):
+        if self.game.state()["phase"] not in ("prepare", "storm"):
+            self.job.start(self.snapshot())
 
     async def handle(self, action):
         if not isinstance(action, dict) or "type" not in action:
@@ -52,8 +69,12 @@ class GameSession:
         elif kind == "new_game":
             self.new_game(action.get("storm", "uri2021"), int(action.get("seed", 42)))
         else:
+            event = self.game.state().get("event") if kind == "choose" else None
             self.game.apply(action)
-            self.log.append({"step": self.steps, "action": action})
+            entry = {"step": self.steps, "action": action}
+            if event:  # for turning-point labels
+                entry["option_label"] = next((o["label"] for o in event["options"] if o["id"] == action.get("option")), None)
+            self.log.append(entry)
             if kind == "start_storm":
                 self.paused = False
             if kind in ("cut", "restore"):
@@ -67,6 +88,12 @@ class GameSession:
 
     async def _recount(self, circuit_id):
         if await self.records.recount(circuit_id):
+            await self.broadcast()
+
+    async def _write_event(self, event):
+        text = await analyst.write(analyst.EVENT_PROMPT, analyst.event_facts(event), max_tokens=60)
+        if text:
+            self.event_text[event["id"]] = text
             await self.broadcast()
 
     async def run_clock(self):
@@ -93,6 +120,7 @@ class GameSession:
                     self.history.append({"time": s["time"], "people_cold": s["totals"]["people_cold"]})
                     if s["phase"] != "storm" or s.get("event"):
                         owed = 0.0
+                        self.finish()
                         break
             except Exception:
                 log.exception("engine step failed; pausing")
@@ -105,6 +133,9 @@ class GameSession:
         s = self.state()
         for circuit_id in self.records.missing(s["circuits"]):  # circuits the engine cut on its own
             self._spawn(self._recount(circuit_id))
+        if s.get("event") and s["event"]["id"] not in self.event_text:
+            self.event_text[s["event"]["id"]] = None  # in progress
+            self._spawn(self._write_event(s["event"]))
         if not self.clients:
             return
         for ws in list(self.clients):

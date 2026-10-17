@@ -15,6 +15,7 @@ Live at **http://148.100.98.237:8000**
 | `GET /api/report` | How-you-did data (shape below) |
 | `GET /api/health` | Engine in use (`stub` or `stormgame`), CPU arch, cores |
 | `GET /api/records` | Encrypted customer-record counting stats (records counted, records/s) |
+| `GET /api/ai` | Evidence for the video: CPU (IBM z17, NNPA, CPACF), M1 errors, Granite speed, records/s, last report's replay and stress-test times |
 
 A bad action sent over the WebSocket gets `{"error": "..."}` back to that client only; it has no `time` field, so skip it when reading state.
 
@@ -42,7 +43,9 @@ A bad action sent over the WebSocket gets `{"error": "..."}` back to that client
 }
 ```
 
-`chart` is hourly people in cold homes. `turning_points`, `summary` and `stress_test` fill in as the AI parts land.
+`chart` is hourly people in cold homes. When the storm ends the server fills in, in order: `turning_points` (the 3 decisions whose removal changes cold person-hours most; `cold_person_hours_change` > 0 means the decision saved that many), `summary` (the facts as computed sentences, then Granite's one-sentence coaching tip appended once it passes the number check; `summary_source` is `pending`, `template` or `granite`), then `stress_test` (`status` `running` with `done`/`storms`, then `wins`, `win_pct`, `worst`). Re-fetch the report every few seconds until `stress_test.status` is `done`.
+
+While an event card is open, `event.ai_text` appears once Granite has rewritten the card (about 15 s); show the engine's `text` until then.
 
 ## Engine
 

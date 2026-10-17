@@ -1,11 +1,22 @@
-"""GET /api/report: the player's result next to the 2021 playbook and the AI playing alone."""
+"""GET /api/report: the player's result next to the 2021 playbook and the AI playing alone.
+
+When a storm ends, ReportJob fills in turning points, the analyst summary and the stress test in the
+background; the report shows whatever is ready.
+"""
+import asyncio
+import logging
 from functools import lru_cache
 
+from . import analyst, jobs
 from .engine import Game
 from .players import PLAYERS, play_out
 
+log = logging.getLogger("controlroom.report")
+
 STEPS_PER_HOUR = 12
 AI_ALONE_PLAYER = "greedy"  # replaced by the M2 what-if player once it is trained
+STRESS_OPERATOR = "greedy"
+_stress_baselines = {}  # playbook_2021 cold person-hours by generated-storm seed, shared by every stress test
 
 
 def _hourly(history):
@@ -22,7 +33,45 @@ def baselines(storm, seed):
     return out
 
 
-def build_report(snapshot, base):
+class ReportJob:
+    def __init__(self):
+        self.task = None
+        self.turning_points = None
+        self.turning_points_run = None
+        self.summary = None
+        self.summary_source = "pending"
+        self.stress = {"status": "not_started"}
+
+    def start(self, snapshot):
+        if self.task is None:
+            self.task = asyncio.create_task(self._run(snapshot))
+
+    def cancel(self):
+        if self.task:
+            self.task.cancel()
+
+    async def _run(self, snap):
+        try:
+            base = await asyncio.to_thread(baselines, snap["storm"], snap["seed"])
+            scores = {"you": snap["score"], "real_2021": base["real_2021"]["score"], "ai_alone": base["ai_alone"]["score"]}
+            self.turning_points, self.turning_points_run = await jobs.turning_points(
+                snap["storm"], snap["seed"], snap["log"], snap["score"], snap["history"])
+            # Facts come from the template; Granite adds one coaching sentence (a 2B model flipped comparisons
+            # when asked to write the facts itself).
+            self.summary, self.summary_source = analyst.template_summary(scores, self.turning_points), "template"
+            if self.turning_points:
+                tip = await analyst.write(analyst.TIP_PROMPT, analyst.tip_facts(self.turning_points), 60)
+                if tip:
+                    self.summary, self.summary_source = f"{self.summary} {tip}", "granite"
+            plan = [e["action"] for e in snap["log"] if e["action"]["type"] == "buy"]
+            await jobs.stress_test(plan, STRESS_OPERATOR, self.stress, _stress_baselines)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("report job failed")
+
+
+def build_report(snapshot, base, job):
     you = _hourly(snapshot["history"])
     axis = base["real_2021"]["hourly"]
     return {
@@ -42,7 +91,9 @@ def build_report(snapshot, base):
         },
         "ai_alone_player": AI_ALONE_PLAYER,
         "winter_plan": [e["action"] for e in snapshot["log"] if e["action"]["type"] == "buy"],
-        "turning_points": [],
-        "summary": None,
-        "stress_test": {"status": "not_started"},
+        "turning_points": job.turning_points or [],
+        "turning_points_run": job.turning_points_run,
+        "summary": job.summary,
+        "summary_source": job.summary_source,
+        "stress_test": job.stress,
     }

@@ -7,6 +7,7 @@ engine/stormgame is importable.
 """
 import copy
 import math
+import random
 from datetime import datetime, timedelta, timezone
 
 CST = timezone(timedelta(hours=-6))
@@ -56,6 +57,10 @@ def _interp(keys, h):
 class Game:
     def __init__(self, storm="uri2021", seed=42):
         self.storm, self.seed = storm, seed
+        # Generated storms: Uri's shape, shifted warmer or colder and with a milder or harsher cut order.
+        rng = random.Random(seed)
+        self.temp_shift = rng.uniform(-4, 14) if storm == "generated" else 0.0
+        self.order_scale = rng.uniform(0.3, 1.2) if storm == "generated" else 1.0
         self.time = PREP_TIME
         self.phase = "prepare"
         self.points = 10
@@ -102,12 +107,12 @@ class Game:
         return (self.time - STORM_START).total_seconds() / 3600
 
     def outside_f(self):
-        return 28.0 if self.phase == "prepare" else _interp(OUTSIDE_F, self._hours_in())
+        return 28.0 if self.phase == "prepare" else _interp(OUTSIDE_F, self._hours_in()) + self.temp_shift
 
     def order_mw(self):
         if self.phase == "prepare":
             return 0.0
-        order = _interp(ORDER_MW, self._hours_in())
+        order = _interp(ORDER_MW, self._hours_in()) * self.order_scale
         if not self._building("gas-1")["on"]:
             order *= 1.15
         if self.conservation and self._hours_in() < 24:

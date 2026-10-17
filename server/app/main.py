@@ -11,11 +11,13 @@ from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from . import analyst
 from .engine import ENGINE_NAME
 from .report import baselines, build_report
 from .session import GameSession
 
 logging.basicConfig(level=logging.INFO)
+MODELS = Path(__file__).resolve().parents[2] / "ai" / "models"
 session = GameSession()
 
 
@@ -50,6 +52,28 @@ def get_records():
     return session.records.stats()
 
 
+def _cpu():
+    info = Path("/proc/cpuinfo").read_text() if Path("/proc/cpuinfo").exists() else ""
+    machine = next((line.split("machine = ")[1].strip() for line in info.splitlines() if "machine = " in line), None)
+    features = next((line.split(":", 1)[1].split() for line in info.splitlines() if line.startswith("features")), [])
+    names = {"3931": "IBM z16", "3932": "IBM z16", "9175": "IBM z17", "9176": "IBM z17"}
+    return {"arch": platform.machine(), "machine_type": machine, "model": names.get(machine, machine),
+            "cores": os.cpu_count(), "nnpa_ai_accelerator": "nnpa" in features, "cpacf_crypto": "msa" in features}
+
+
+@app.get("/api/ai")
+def get_ai():
+    """Evidence for the video: the hardware and every AI part's numbers."""
+    m1 = MODELS / "m1_meta.json"
+    job = session.job
+    return {"platform": _cpu(),
+            "m1_forecast": json.loads(m1.read_text())["metrics"] if m1.exists() else None,
+            "m3_analyst": analyst.summary_stats(),
+            "records": session.records.stats(),
+            "last_report": {"turning_points": job.turning_points_run,
+                            "stress_test": {k: job.stress.get(k) for k in ("status", "storms", "seconds", "cores")}}}
+
+
 @app.post("/api/action")
 async def post_action(action: dict = Body(...)):
     try:
@@ -62,10 +86,10 @@ async def post_action(action: dict = Body(...)):
 @app.get("/api/report")
 async def get_report():
     # Snapshot on the event loop so the clock can't change the game mid-read; baselines run in a thread.
-    snapshot = {"storm": session.storm, "seed": session.seed, "phase": session.game.state()["phase"],
-                "score": session.game.score(), "history": list(session.history), "log": list(session.log)}
+    session.finish()
+    snapshot = session.snapshot()
     base = await asyncio.to_thread(baselines, session.storm, session.seed)
-    return build_report(snapshot, base)
+    return build_report(snapshot, base, session.job)
 
 
 @app.websocket("/ws")

@@ -4,7 +4,8 @@
 *.pem
 data
 hardware
-ai/models
+ai/models/hf
+*.gguf
 web/*
 !web/dist
 **/__pycache__
