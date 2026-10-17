@@ -25,7 +25,7 @@ services:
     restart: unless-stopped
 
   # M3 analyst: Granite 3.3 2B on llama.cpp. Start with: podman-compose up -d llm
-  # Needs ~/models/granite-3.3-2b-instruct-be.gguf from ai/llm/prepare_model.sh.
+  # Needs ~/models/granite-3.3-2b-instruct-q8-be.gguf from ai/llm/prepare_model.sh.
   llm:
     image: localhost/controlroom-llm:latest
     build:

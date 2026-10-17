@@ -7,9 +7,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 --branch ${LLAMA_CPP_TAG} https://github.com/ggml-org/llama.cpp /src
 # The VM is an IBM z17, but Ubuntu 24.04's GCC 13 only knows up to z16 (z17 needs GCC 15),
-# so target z16 by hand instead of GGML_NATIVE. VXE2 vector code stays on.
+# so target z16 by hand instead of GGML_NATIVE. GGML_VXE defaults to GGML_NATIVE, so turn the
+# vector kernels back on explicitly; without them generation is ~1 token/s.
 RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
-        -DGGML_NATIVE=OFF -DCMAKE_C_FLAGS="-march=z16 -mtune=z16" -DCMAKE_CXX_FLAGS="-march=z16 -mtune=z16" \
+        -DGGML_NATIVE=OFF -DGGML_VXE=ON \
+        -DCMAKE_C_FLAGS="-march=z16 -mtune=z16" -DCMAKE_CXX_FLAGS="-march=z16 -mtune=z16" \
     && cmake --build /build -j"$(nproc)" --target llama-server llama-cli
 
 FROM docker.io/library/ubuntu:24.04
@@ -17,4 +19,4 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 libcur
     && rm -rf /var/lib/apt/lists/*
 COPY --from=build /build/bin/llama-server /build/bin/llama-cli /usr/local/bin/
 EXPOSE 8080
-CMD ["llama-server", "-m", "/models/granite-3.3-2b-instruct-be.gguf", "--host", "0.0.0.0", "--port", "8080", "-c", "4096"]
+CMD ["llama-server", "-m", "/models/granite-3.3-2b-instruct-q8-be.gguf", "--host", "0.0.0.0", "--port", "8080", "-c", "4096"]
