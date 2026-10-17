@@ -1,0 +1,11 @@
+.env
+*.pem
+.DS_Store
+__pycache__/
+*.pyc
+.venv/
+node_modules/
+web/dist/
+ai/models/
+*.gguf
+data/raw/

@@ -1,0 +1,4 @@
+# numpy, pandas and psycopg come from Ubuntu's s390x packages (see Containerfile); PyPI has no s390x wheels for them.
+fastapi
+uvicorn
+websockets

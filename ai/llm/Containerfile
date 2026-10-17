@@ -1,0 +1,20 @@
+# M3 analyst: llama.cpp server for IBM Granite on LinuxONE (s390x, big-endian).
+# The model is mounted at /models; it must be a big-endian GGUF (see ai/llm/prepare_model.sh).
+FROM docker.io/library/ubuntu:24.04 AS build
+ARG LLAMA_CPP_TAG=b11267
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential cmake git ca-certificates libcurl4-openssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch ${LLAMA_CPP_TAG} https://github.com/ggml-org/llama.cpp /src
+# The VM is an IBM z17, but Ubuntu 24.04's GCC 13 only knows up to z16 (z17 needs GCC 15),
+# so target z16 by hand instead of GGML_NATIVE. VXE2 vector code stays on.
+RUN cmake -S /src -B /build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF \
+        -DGGML_NATIVE=OFF -DCMAKE_C_FLAGS="-march=z16 -mtune=z16" -DCMAKE_CXX_FLAGS="-march=z16 -mtune=z16" \
+    && cmake --build /build -j"$(nproc)" --target llama-server llama-cli
+
+FROM docker.io/library/ubuntu:24.04
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 libcurl4t64 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /build/bin/llama-server /build/bin/llama-cli /usr/local/bin/
+EXPOSE 8080
+CMD ["llama-server", "-m", "/models/granite-3.3-2b-instruct-be.gguf", "--host", "0.0.0.0", "--port", "8080", "-c", "4096"]
