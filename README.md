@@ -139,6 +139,11 @@ Training jobs run in the `ai` container (`ai/forecast/train_forecast.py`, `ai/m2
 - IBM Granite TimeSeries TTM-R2: https://huggingface.co/ibm-granite/granite-timeseries-ttm-r2
 - IBM Granite 3.3 2B Instruct (GGUF): https://huggingface.co/ibm-granite/granite-3.3-2b-instruct-GGUF
 
+**Tools and services**
+- Mermaid (architecture and flow diagrams): https://github.com/mermaid-js/mermaid
+- Playwright (browser playtests): https://github.com/microsoft/playwright
+- ElevenLabs text-to-speech API (the optional voice guide; a commercial service, not open source): https://elevenlabs.io/docs
+
 **Data**
 - EIA-930 Hourly Electric Grid Monitor (ERCOT demand): https://www.eia.gov/electricity/gridmonitor/
 - Open-Meteo Historical Weather API (Dallas, Houston, San Antonio, Austin): https://open-meteo.com/en/docs/historical-weather-api
