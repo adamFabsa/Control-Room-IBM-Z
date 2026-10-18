@@ -1,4 +1,4 @@
-"""CONTROL ROOM: URI game engine."""
+"""Lights Out game engine."""
 
 from .game import ActionError, Game
 from .players import PLAYERS, Greedy, Playbook2021, play, replay

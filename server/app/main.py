@@ -1,4 +1,4 @@
-"""CONTROL ROOM: URI game server. Runs the storm clock on LinuxONE and talks to browsers and the hardware bridge."""
+"""Lights Out game server. Runs the storm clock on LinuxONE and talks to browsers and the hardware bridge."""
 import asyncio
 import json
 import logging
@@ -31,7 +31,7 @@ async def lifespan(app):
     clock.cancel()
 
 
-app = FastAPI(title="CONTROL ROOM: URI", lifespan=lifespan)
+app = FastAPI(title="Lights Out", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 

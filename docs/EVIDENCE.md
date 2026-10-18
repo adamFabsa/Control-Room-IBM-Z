@@ -1,4 +1,4 @@
-# Evidence: CONTROL ROOM: URI on IBM LinuxONE
+# Evidence: Lights Out on IBM LinuxONE
 
 For the video, `bash ~/control-room/scripts/linuxone_tour.sh` on the VM prints the machine, containers, the three AI models, the encryption and the live game on one screen (read-only, no secrets). The sections below are the same facts command by command.
 

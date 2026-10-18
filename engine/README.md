@@ -1,4 +1,4 @@
-# stormgame: the CONTROL ROOM: URI game engine (Part 1A)
+# stormgame: the Lights Out game engine (Part 1A)
 
 Plain Python 3.11 + NumPy + pandas. No screen, no server, no network calls. The same seed always gives the same game.
 

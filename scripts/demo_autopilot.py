@@ -1,4 +1,4 @@
-"""Demo autopilot: plays CONTROL ROOM: URI through the server's API while the presenter talks and works the
+"""Demo autopilot: plays Lights Out through the server's API while the presenter talks and works the
 Grid Status Box. For recording the demo only; the game itself never plays for the player.
 
   ssh -i ~/Downloads/datathon.pem linux1@148.100.98.237

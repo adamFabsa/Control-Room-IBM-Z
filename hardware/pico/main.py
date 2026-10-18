@@ -1,4 +1,4 @@
-# Grid Status Box (CONTROL ROOM: URI). Runs on a Raspberry Pi Pico 2 with MicroPython.
+# Grid Status Box (Lights Out). Runs on a Raspberry Pi Pico 2 with MicroPython.
 # USB serial, one word per line.
 #   Pico -> laptop: PAUSE, SPEED, CONFIRM
 #   Laptop -> Pico: GREEN, YELLOW, RED (light only that LED), BEEP (2 kHz, 100 ms), TONE (1 kHz, 1 s)

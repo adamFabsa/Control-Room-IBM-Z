@@ -42,7 +42,7 @@ export function TimeWidget({ compact = false }: { compact?: boolean }) {
   return (
     <section className={`panel time-widget pop${compact ? ' compact' : ''}`} aria-label="Game clock">
       <header className="tw-head">
-        <span className="brand">CONTROL ROOM: <b>URI</b></span>
+        <span className="brand">LIGHTS <b>OUT</b></span>
         <span className="tw-head-end">
           <span className={`link-badge ${connected ? 'up' : 'down'}`} title={linkKind === 'mock' ? 'Mock game in the browser' : 'Live LinuxONE server'}>
             {link}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# One screen that shows CONTROL ROOM: URI running on IBM LinuxONE, for the demo video and the judges.
+# One screen that shows Lights Out running on IBM LinuxONE, for the demo video and the judges.
 # Read-only, and it prints no secrets (it never reads .env; records show only their encrypted bytes).
 # Run on the VM:  bash ~/control-room/scripts/linuxone_tour.sh
 set -uo pipefail

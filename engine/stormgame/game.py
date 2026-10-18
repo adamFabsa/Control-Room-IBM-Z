@@ -1,4 +1,4 @@
-"""CONTROL ROOM: URI game engine. Plain Python + NumPy, deterministic for a given seed."""
+"""Lights Out game engine. Plain Python + NumPy, deterministic for a given seed."""
 
 import copy
 import math

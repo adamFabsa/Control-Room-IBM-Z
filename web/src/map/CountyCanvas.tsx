@@ -100,7 +100,7 @@ export function CountyCanvas() {
       {loading && (
         <div className="county-loading" role="status" aria-live="polite">
           <div className="cl-card">
-            <span className="cl-brand">CONTROL ROOM: URI</span>
+            <span className="cl-brand">LIGHTS OUT</span>
             <h1>Building Dallas County</h1>
             <p className="cl-step">{loading.step}…</p>
             <div className="cl-bar"><i style={{ width: `${Math.round(loading.p * 100)}%` }} /></div>

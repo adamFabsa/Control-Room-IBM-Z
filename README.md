@@ -1,4 +1,4 @@
-# CONTROL ROOM: URI
+# Lights Out
 
 A winter-storm simulation game set in Dallas County. You get the county ready, decide which neighborhoods lose power when Winter Storm Uri hits, and AI running on IBM LinuxONE compares your choices with what really happened in February 2021.
 

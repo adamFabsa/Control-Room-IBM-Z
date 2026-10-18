@@ -1,4 +1,4 @@
-# CONTROL ROOM: URI · game screens (Part 1B)
+# Lights Out · game screens (Part 1B)
 
 The browser game: a live 3D Dallas County in a winter storm, plus the three screens (Get ready, Storm, How you did). Built with React, TypeScript, Vite and three.js. The game state comes from the FastAPI server on IBM LinuxONE over a WebSocket.
 
