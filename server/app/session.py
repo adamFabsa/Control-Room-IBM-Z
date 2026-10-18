@@ -3,7 +3,7 @@ import asyncio
 import logging
 import os
 
-from . import analyst, autopilot, m2
+from . import analyst, m2
 from .engine import Game
 from .forecast import Forecast
 from .records import Records
@@ -48,9 +48,6 @@ class GameSession:
 
     def new_game(self, storm="uri2021", seed=42, quick=None):
         self.quick = QUICK_DEFAULT if quick is None else bool(quick)
-        if getattr(self, "autopilot_task", None):
-            self.autopilot_task.cancel()
-        self.autopilot, self.autopilot_task = False, None  # the demo autopilot (start_storm with "autopilot")
         if getattr(self, "job", None):
             self.job.cancel()
         self.job = ReportJob()
@@ -108,7 +105,6 @@ class GameSession:
         self.notices.update(s)
         s["notices"] = list(self.notices.items)
         s["quick"] = self.quick
-        s["autopilot"] = self.autopilot
         s["fast_forward"] = self._quiet(s) and not self.paused
         if self.hold and s["phase"] == "storm":
             short = max(0, s["order_mw"] - s["cut_mw"])
@@ -166,18 +162,10 @@ class GameSession:
         elif kind == "sell":
             self._sell(action)
         else:
-            # {"type": "start_storm", "autopilot": true} (the page opened with ?autopilot, for recording a demo):
-            # the server plays the storm; with nothing placed in Get ready it puts in a plan first
-            auto = kind == "start_storm" and bool(action.get("autopilot"))
-            if auto and self.game.state()["phase"] == "prepare":
-                autopilot.place_plan_if_empty(self)
-            step = self._engine_action({"type": "start_storm"} if kind == "start_storm" else action)
+            step = self._engine_action(action)
             if kind == "start_storm":
                 self.paused = False
                 self.speed = START_SPEED
-                if auto:
-                    self.autopilot = True
-                    self.autopilot_task = self._spawn(autopilot.run(self, self.game))
             self._defer_routine()
             self._resume_if_covered()
             if kind == "cut" and action.get("minutes"):  # a timed cut: the server restores it later
@@ -287,7 +275,6 @@ class GameSession:
         task = asyncio.create_task(coro)
         self._tasks.add(task)
         task.add_done_callback(self._tasks.discard)
-        return task
 
     async def _recount(self, circuit_id):
         if await self.records.recount(circuit_id):

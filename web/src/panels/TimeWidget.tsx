@@ -1,4 +1,4 @@
-import { Bot, Hourglass, Moon, Pause, Play, Sun, Sunrise, Sunset, Thermometer } from 'lucide-react';
+import { Hourglass, Moon, Pause, Play, Sun, Sunrise, Sunset, Thermometer } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { gameClock } from '../format';
 import { SUNRISE, SUNSET, goldenAt, skyPhase } from '../sky';
@@ -8,7 +8,6 @@ import { clock12 } from './hud';
 import { StormTimeline } from './StormTimeline';
 
 const SPEEDS = [1, 2, 3, 4, 5];
-const AUTOPILOT_URL = new URLSearchParams(location.search).has('autopilot');
 
 const hhmm = (h: number) => { const c = clock12(`${Math.floor(h)}:${Math.round((h % 1) * 60)}`); return `${c.hm} ${c.ampm}`; };
 /** The dial's face, from the same sun times the 3D county uses (sky.ts), so the dial and the map agree. */
@@ -39,15 +38,12 @@ export function TimeWidget({ compact = false }: { compact?: boolean }) {
   const held = useStore((s) => !!s.state?.hold);
   const status = eventOpen ? 'decide' : held ? 'hold' : paused ? 'paused' : fast ? 'fast' : 'live';
   const link = linkKind === 'mock' ? 'MOCK' : connected ? 'LINUXONE' : 'OFFLINE';
-  // playing, or ready to play once the storm starts (the page was opened with ?autopilot)
-  const autopilot = useStore((s) => !!s.state?.autopilot || (s.state?.phase === 'ready' && AUTOPILOT_URL));
 
   return (
     <section className={`panel time-widget pop${compact ? ' compact' : ''}`} aria-label="Game clock">
       <header className="tw-head">
         <span className="brand">LIGHTS <b>OUT</b></span>
         <span className="tw-head-end">
-          {autopilot && <span className="autopilot-badge" title="The demo autopilot plays the map; cards wait for your call"><Bot size={12} strokeWidth={2.6} /> AUTOPILOT</span>}
           <span className={`link-badge ${connected ? 'up' : 'down'}`} title={linkKind === 'mock' ? 'Mock game in the browser' : 'Live LinuxONE server'}>
             {link}
           </span>

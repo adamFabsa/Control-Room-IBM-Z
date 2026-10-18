@@ -83,8 +83,6 @@ export interface GameState {
   hold?: { short_mw: number; order_mw: number; cut_more_mw: number };
   warming_centers?: string[];
   quick?: boolean;
-  /** the demo autopilot is playing this storm (the page was opened with ?autopilot) */
-  autopilot?: boolean;
 }
 
 export type BuyItem =
@@ -101,7 +99,7 @@ export type EmergencyItem = 'generator' | 'warming_center' | 'conservation';
 export type Action =
   | { type: 'buy'; item: BuyItem; target: string }
   | { type: 'sell'; item: BuyItem; target: string }
-  | { type: 'start_storm'; autopilot?: boolean }
+  | { type: 'start_storm' }
   | { type: 'cut'; circuit: string; minutes?: number }
   | { type: 'restore'; circuit: string }
   | { type: 'emergency'; item: EmergencyItem; target?: string }
