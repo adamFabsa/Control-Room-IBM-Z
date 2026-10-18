@@ -8,6 +8,9 @@ import { TimeWidget } from '../panels/TimeWidget';
 import { useStore } from '../store';
 import { useMapKeys } from './StormScreen';
 
+/** ?autopilot (recording a demo): Start the storm hands the storm to the server's autopilot. */
+const AUTOPILOT = new URLSearchParams(location.search).has('autopilot');
+
 interface Item { id: BuyItem; name: string; cost: number; Icon: LucideIcon; color: string; text: string; target: 'circuit' | 'building' | 'auto' }
 
 const ITEMS: Item[] = [
@@ -95,7 +98,7 @@ export function ReadyScreen() {
           <button
             type="button"
             className="gbtn ice start-btn"
-            onClick={() => { setUI({ buyItem: null, tool: 'inspect', selected: null }); send({ type: 'start_storm' }); }}
+            onClick={() => { setUI({ buyItem: null, tool: 'inspect', selected: null }); send(AUTOPILOT ? { type: 'start_storm', autopilot: true } : { type: 'start_storm' }); }}
           >
             Start the storm <ArrowRight size={22} strokeWidth={2.6} />
           </button>
