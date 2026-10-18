@@ -15,6 +15,10 @@ from .players import ai_player_name, play_out, player, run_official, timeline_po
 log = logging.getLogger("controlroom.report")
 
 STEPS_PER_HOUR = 12
+# Texas DSHS, "February 2021 Winter Storm-Related Deaths - Texas" (final report; data as of Oct 27, 2021):
+# 22 confirmed storm-related deaths in Dallas County (246 statewide; 65% from extreme cold exposure).
+DSHS_DALLAS_DEATHS = 22
+DSHS_URL = "https://www.dshs.texas.gov/sites/default/files/news/updates/SMOC_FebWinterStorm_MortalitySurvReport_12-30-21.pdf"
 _stress_baselines = {}  # playbook_2021 cold person-hours by generated-storm seed, shared by every stress test
 
 
@@ -97,6 +101,14 @@ class ReportJob:
                 self.summary, self.summary_source = f"{self.summary} {tip}", "granite"
 
 
+def estimated_deaths(score, real):
+    """DSHS's 22 Dallas County deaths, scaled by hours in cold homes against the 2021 playbook (2021's own count).
+    None after a grid collapse: days of total blackout aren't something this scale covers."""
+    if score.get("grid_collapsed") or not real["cold_person_hours"]:
+        return None
+    return round(DSHS_DALLAS_DEATHS * score["cold_person_hours"] / real["cold_person_hours"])
+
+
 PLAN_NAMES = {"protect": "Protect {}", "generator": "A generator at {}", "warming_center": "A warming center at {}",
               "keep_gas": "Keep gas flowing at {}", "conservation": "A conservation alert", "repair_crews": "Repair crews ready",
               "smart_switch": "Smart switches on {}"}
@@ -115,7 +127,8 @@ def _stress_for_screen(stress):
 
 def build_report(snapshot, base, job):
     you = snapshot["hourly"]
-    axis = max((base["real_2021"]["hourly"], base["ai_alone"]["hourly"], you), key=len)
+    axis_2021 = base["real_2021"]["hourly"]
+    axis = max((axis_2021, base["ai_alone"]["hourly"], you), key=len)
     report = {
         "storm": snapshot["storm"],
         "seed": snapshot["seed"],
@@ -145,6 +158,17 @@ def build_report(snapshot, base, job):
     report["beat_playbook"] = effective_cph(you_score) < effective_cph(real_score)
     report["cold_people_by_hour"] = {"t": report["chart"]["time"], "playbook_2021": report["chart"]["real_2021"],
                                      "ai_alone": report["chart"]["ai_alone"], "player": report["chart"]["you"]}
+    report["no_power_by_hour"] = {"t": report["chart"]["time"],
+                                  "playbook_2021": [h.get("people_no_power", 0) for h in axis_2021],
+                                  "ai_alone": [h.get("people_no_power", 0) for h in base["ai_alone"]["hourly"]],
+                                  "player": [h.get("people_no_power", 0) for h in you]}
+    ai_score = base["ai_alone"]["score"]
+    report["estimated_deaths"] = {
+        "player": estimated_deaths(you_score, real_score), "playbook_2021": DSHS_DALLAS_DEATHS,
+        "ai_alone": estimated_deaths(ai_score, real_score),
+        "method": f"The {DSHS_DALLAS_DEATHS} storm deaths Texas DSHS confirmed in Dallas County in 2021, scaled by the "
+                  "hours people spent in cold homes in each game against the 2021 playbook. An estimate, not a forecast.",
+        "source": "Texas DSHS, February 2021 Winter Storm-Related Deaths (final report)", "source_url": DSHS_URL}
     report["plan"] = [PLAN_NAMES.get(a["item"], a["item"]).format(a.get("target") or "") for a in report["winter_plan"]]
     for tp in report["turning_points"]:
         steps = snapshot["history"]

@@ -66,6 +66,8 @@ class Notices:
             return
         for cid in sorted(now["ice"] - p["ice"]):
             self._add("ice", f"Ice brought down a line in {area[cid]}. {cid} is dark until crews fix it.", s, cid)
+        for cid in sorted(p["ice"] - now["ice"]):
+            self._add("repair", f"Crews fixed the iced line in {area.get(cid, cid)}.", s, cid)
         for cid in sorted(now["cold"] - p["cold"]):
             self._add("cold", f"Homes in {area[cid]} ({cid}) dropped below 50°F.", s, cid)
         if now["boil"] and not p["boil"]:

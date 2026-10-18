@@ -1,7 +1,7 @@
 // HTML layer over the canvas: status markers, map labels and the co-pilot pin.
 // React renders the content; positions are written straight to the DOM every frame, and lower-priority
 // labels hide when they would overlap a more important one, so the map never turns into a pile of tags.
-import { GraduationCap, House, Landmark, Moon, Shield, Sparkles, Thermometer, ZapOff, type LucideIcon } from 'lucide-react';
+import { Bot, GraduationCap, House, Landmark, Moon, Shield, Thermometer, ZapOff, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import type { Circuit } from '../contracts';
 import { dur, fmt, shortDur } from '../format';
@@ -127,7 +127,7 @@ export function MapOverlay({ scene }: { scene: MapScene }) {
       {copilot && cpAt && copilot.target && (
         <div className="ov-anchor" ref={bind(`cp-${copilot.target}`, [cpAt[0], cpAt[1], scene.topOf(copilot.target) + 0.12], PRI.copilot, 'bottom', 0, 76, true)}>
           <div className={`ov-copilot${day ? ' ready' : ''}`}>
-            <span className="who"><Sparkles size={12} /> AI co-pilot</span>
+            <span className="who"><Bot size={14} strokeWidth={2.4} /> AI co-pilot</span>
             <span>{copilot.tip}</span>
             <span className="leader" aria-hidden />
           </div>

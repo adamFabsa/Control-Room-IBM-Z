@@ -1,4 +1,4 @@
-import { AlertTriangle, Sparkles } from 'lucide-react';
+import { AlertTriangle, Bot } from 'lucide-react';
 import type { EventOption } from '../contracts';
 import { useStore } from '../store';
 import { compact } from './hud';
@@ -30,7 +30,7 @@ export function DecisionCard() {
         <h2 id="ev-title">{ev.title}</h2>
         {ev.text && <p id="ev-text">{ev.text}</p>}
         {ev.ai_text && (
-          <p className="dc-ai"><Sparkles size={13} strokeWidth={2.6} aria-hidden="true" /><span><b>Granite on LinuxONE:</b> {ev.ai_text}</span></p>
+          <p className="dc-ai"><Bot size={15} strokeWidth={2.4} aria-hidden="true" /><span><b>Granite on LinuxONE:</b> {ev.ai_text}</span></p>
         )}
         <div className="options">
           {ev.options.map((o, i) => (
@@ -47,7 +47,7 @@ export function DecisionCard() {
                 {o.label}
                 {o.m2 && <small className="opt-m2" title="M2 what-if model (Snap ML on LinuxONE), next 6 game hours">M2: {m2Words(o.m2)}</small>}
               </span>
-              {o.ai_pick && <span className="ai-badge"><Sparkles size={12} strokeWidth={2.6} /> AI PICK</span>}
+              {o.ai_pick && <span className="ai-badge"><Bot size={13} strokeWidth={2.6} /> AI PICK</span>}
             </button>
           ))}
         </div>

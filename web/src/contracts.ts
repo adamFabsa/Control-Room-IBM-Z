@@ -79,6 +79,7 @@ export interface GameState {
   weather?: { snow?: number };
   /** quick play: the clock is fast-forwarding (no cut order, every neighborhood has power) */
   fast_forward?: boolean;
+  warming_centers?: string[];
   quick?: boolean;
 }
 
@@ -130,5 +131,8 @@ export interface Report {
   plan?: string[];
   stress_test?: { storms: number; works: number; worst: string; seconds?: number; cores?: number; collapses?: number };
   stress_test_progress?: { status?: string; done?: number; storms?: number };
+  no_power_by_hour?: { t: string[]; playbook_2021: number[]; ai_alone: number[]; player: number[] };
+  /** DSHS's 22 Dallas County deaths in 2021, scaled by each game's hours in cold homes; null after a grid collapse */
+  estimated_deaths?: { player: number | null; playbook_2021: number; ai_alone: number | null; method: string; source: string; source_url: string };
   game_check?: string;
 }

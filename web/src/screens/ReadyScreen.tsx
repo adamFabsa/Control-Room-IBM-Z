@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { BuyItem, GameState } from '../contracts';
 import { mapControls } from '../map/controls';
 import { CameraWidget } from '../panels/CameraWidget';
+import { PlanList } from '../panels/PlanList';
 import { TimeWidget } from '../panels/TimeWidget';
 import { useStore } from '../store';
 import { useMapKeys } from './StormScreen';
@@ -71,6 +72,7 @@ export function ReadyScreen() {
           </div>
         </div>
       </div>
+      <div className="slot right"><PlanList /></div>
       <div className="slot bottom-left"><CameraWidget /></div>
       <div className="slot bottom-center ready-bottom">
         <div className="ready-row">

@@ -225,6 +225,16 @@ export class Synth {
 
   // ---------------------------------------------------------------- news
 
+  /** The grid operator's order: a radio-dispatch two-tone (three notes when cuts begin), clearly over the wind. */
+  order(t: number, first: boolean): void {
+    const notes = first ? [880, 659.25, 880] : [880, 659.25];
+    notes.forEach((f, i) => {
+      const at = t + i * 0.17;
+      this.tone(at, { type: 'square', freq: f, peak: 0.045, attack: 0.004, hold: 0.08, decay: 0.09, lowpass: 2400 });
+      this.tone(at, { freq: f, peak: 0.07, attack: 0.004, hold: 0.08, decay: 0.12 });
+    });
+  }
+
   /** A soft rising two-tone bell for a new decision card. */
   bell(t: number): void {
     this.bellNote(t, 523.25, 0.085);

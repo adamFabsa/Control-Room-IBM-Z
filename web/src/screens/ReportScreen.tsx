@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, ClipboardList, FlaskConical, RotateCcw, Sparkles, Trophy, UserRound } from 'lucide-react';
+import { Bot, CalendarClock, ClipboardList, FlaskConical, HeartPulse, RotateCcw, Trophy, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Report } from '../contracts';
 import { fmt, gameClock } from '../format';
@@ -33,8 +33,9 @@ function niceMax(v: number): number {
   return ([1, 2, 5, 10].find((m) => m * p >= v) ?? 10) * p;
 }
 
-function Chart({ r }: { r: Report }) {
-  const s = r.cold_people_by_hour;
+type Series = NonNullable<Report['cold_people_by_hour']>;
+
+function Chart({ s, what }: { s?: Series; what: string }) {
   if (!s || s.t.length < 2) return null;
   const W = 640, H = 230, padL = 44, padR = 12, padT = 10, padB = 26;
   const n = s.t.length; // every line starts at the storm's first hour; a collapsed game's line just ends early
@@ -51,7 +52,7 @@ function Chart({ r }: { r: Report }) {
   const first = real ? gameClock(s.t[0]).label.split(' ')[0] : 'Sun';
   const days: [string, number][] = (midnights[0]?.[1] ?? n) >= n * 0.09 ? [[first, 0], ...midnights] : midnights;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label={`People in cold homes each hour; top of the scale ${fmt(max)}`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label={`${what} each hour; top of the scale ${fmt(max)}`}>
       {[0, 0.5, 1].map((f) => (
         <g key={f}>
           <line x1={padL} x2={W - padR} y1={y(max * f)} y2={y(max * f)} className={f ? 'grid' : 'axis'} />
@@ -65,6 +66,67 @@ function Chart({ r }: { r: Report }) {
       <path d={path(s.ai_alone)} className="l-ai" />
       <path d={path(s.player)} className="l-you" />
     </svg>
+  );
+}
+
+/** The DSHS-anchored estimate of deaths, big, next to 2021's confirmed count. */
+function Deaths({ r }: { r: Report }) {
+  const d = r.estimated_deaths;
+  if (!d) return null;
+  const diff = d.player == null ? null : d.player - d.playbook_2021;
+  return (
+    <section className="panel deaths" aria-labelledby="deaths-title">
+      <div className="deaths-main">
+        <span className="deaths-ico" aria-hidden="true"><HeartPulse size={22} strokeWidth={2.3} /></span>
+        <div>
+          <span className="deaths-eyebrow" id="deaths-title">Estimated deaths in Dallas County</span>
+          <b className="deaths-you">{d.player == null ? 'Grid collapsed' : `≈ ${fmt(d.player)}`}</b>
+          <span className={`deaths-diff ${diff == null ? 'bad' : diff < 0 ? 'good' : diff > 0 ? 'bad' : ''}`}>
+            {diff == null ? 'A countywide blackout: no estimate covers it'
+              : diff === 0 ? 'About the same as in 2021'
+              : `About ${fmt(Math.abs(diff))} ${diff < 0 ? 'fewer' : 'more'} than in 2021`}
+          </span>
+        </div>
+      </div>
+      <div className="deaths-side"><b>{fmt(d.playbook_2021)}</b><span>confirmed in 2021<br />(Texas DSHS)</span></div>
+      <div className="deaths-side ai"><b>{d.ai_alone == null ? '—' : `≈ ${fmt(d.ai_alone)}`}</b><span>with the AI<br />playing alone</span></div>
+      <p className="deaths-note">{d.method} <a href={d.source_url} target="_blank" rel="noreferrer">{d.source}</a></p>
+    </section>
+  );
+}
+
+/** You, 2021 and the AI side by side on every outcome the game scores. */
+function Outcomes({ r }: { r: Report }) {
+  const sc = r.scores, d = r.estimated_deaths;
+  const hours = (m?: number) => (m ?? 0) / 60;
+  const rows: { label: string; vals: (number | null | undefined)[]; show: (v: number) => string }[] = [
+    { label: 'Estimated deaths', vals: [d?.playbook_2021, d?.ai_alone, d?.player], show: (v) => fmt(v) },
+    { label: 'Hours in cold homes', vals: [sc.playbook_2021.cold_person_hours, sc.ai_alone.cold_person_hours, sc.player.cold_person_hours], show: compact },
+    { label: 'Longest outage', vals: [hours(sc.playbook_2021.longest_outage_min), hours(sc.ai_alone.longest_outage_min), hours(sc.player.longest_outage_min)], show: (v) => `${Math.round(v)} h` },
+    { label: 'Critical buildings dark', vals: [hours(sc.playbook_2021.critical_dark_min), hours(sc.ai_alone.critical_dark_min), hours(sc.player.critical_dark_min)], show: (v) => `${Math.round(v)} h` },
+    { label: 'People-hours under boil-water notice', vals: [sc.playbook_2021.boil_water_person_hours, sc.ai_alone.boil_water_person_hours, sc.player.boil_water_person_hours], show: compact },
+  ];
+  const who = ['2021', 'AI alone', 'You'];
+  return (
+    <div className="panel outcomes">
+      <div className="chart-head"><b>Your decisions against 2021</b>
+        <span className="legend"><i className="k-2021" />2021 <i className="k-ai" />AI alone <i className="k-you" />You</span></div>
+      {rows.map((row) => {
+        const max = Math.max(...row.vals.map((v) => v ?? 0), 1e-9);
+        return (
+          <div className="oc-row" key={row.label}>
+            <span className="oc-label">{row.label}</span>
+            {row.vals.map((v, i) => (
+              <div className={`oc-bar b${i}`} key={who[i]} title={`${who[i]}: ${v == null ? 'no estimate' : row.show(v)}`}>
+                <i style={{ width: `${v == null ? 0 : Math.max(1.5, (v / max) * 100)}%` }} />
+                <span>{v == null ? '—' : row.show(v)}</span>
+              </div>
+            ))}
+          </div>
+        );
+      })}
+      <small className="muted">Lower is better on every line.</small>
+    </div>
   );
 }
 
@@ -111,6 +173,7 @@ export function ReportScreen() {
             <RotateCcw size={18} strokeWidth={2.6} /> Play again
           </button>
         </div>
+        <Deaths r={report} />
         <div className="tiles">
           <div className="panel tile y2021"><span className="tile-head"><span className="tile-ico"><CalendarClock size={18} strokeWidth={2.4} /></span>What happened in 2021</span><b>{M(sc.playbook_2021.cold_person_hours)}</b><small>hours people spent in cold homes</small></div>
           <div className="panel tile ai"><span className="tile-head"><span className="tile-ico"><Bot size={18} strokeWidth={2.4} /></span>AI playing alone</span><b>{M(sc.ai_alone.cold_person_hours)}</b><small>hours people spent in cold homes</small></div>
@@ -120,7 +183,7 @@ export function ReportScreen() {
           <div className="panel chart-box">
             <div className="chart-head"><b>People in cold homes, day by day</b>
               <span className="legend"><i className="k-2021" />2021 <i className="k-ai" />AI alone <i className="k-you" />You</span></div>
-            <Chart r={report} />
+            <Chart s={report.cold_people_by_hour} what="People in cold homes" />
             {report.game_check && <small className="muted">Game check: {report.game_check}</small>}
             {!!report.turning_points?.length && (
               <div className="turning">
@@ -138,22 +201,34 @@ export function ReportScreen() {
 
           </div>
           <div className="panel analyst">
-            <span className="analyst-head"><span className="tile-ico"><Sparkles size={16} strokeWidth={2.4} /></span>AI analyst</span>
+            <span className="analyst-head"><span className="tile-ico"><Bot size={17} strokeWidth={2.4} /></span>AI analyst</span>
             <p>{report.summary ?? 'Reading your storm…'}</p>
           </div>
         </div>
-        <div className="panel plan-box">
-          <div className="plan">
-            <span className="plan-head"><span className="tile-ico"><ClipboardList size={16} strokeWidth={2.4} /></span>Your plan for next winter</span>
-            <ol>{report.plan?.map((p) => <li key={p}>{p}</li>)}</ol>
+        <div className="report-row even">
+          <div className="report-col">
+            <div className="panel chart-box">
+              <div className="chart-head"><b>People without power, day by day</b>
+                <span className="legend"><i className="k-2021" />2021 <i className="k-ai" />AI alone <i className="k-you" />You</span></div>
+              <Chart s={report.no_power_by_hour} what="People without power" />
+            </div>
+            <div className="panel plan-box">
+              <div className="plan">
+                <span className="plan-head"><span className="tile-ico"><ClipboardList size={16} strokeWidth={2.4} /></span>Your plan for next winter</span>
+                {report.plan?.length
+                ? <ol>{report.plan.map((p) => <li key={p}>{p}</li>)}</ol>
+                : <p className="muted small">You bought nothing in Get ready. Try a generator at the water plant next time.</p>}
+              </div>
+              {report.stress_test ? (
+                <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> Tested on {fmt(report.stress_test.storms)} new storms</span><b>Works in {fmt(report.stress_test.works)}</b><small>{report.stress_test.worst}{report.stress_test.seconds ? ` · ran in ${Math.round(report.stress_test.seconds)} s on ${report.stress_test.cores} LinuxONE cores` : ''}</small></div>
+              ) : (
+                <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> 1,000-storm stress test</span>
+                  <b>{report.stress_test_progress?.status === 'running' ? `Testing… ${fmt(report.stress_test_progress.done ?? 0)} of ${fmt(report.stress_test_progress.storms ?? 1000)}` : 'Runs on LinuxONE'}</b>
+                  <small>Your plan on storms generated from real Dallas cold spells (2005–2026), against the 2021 playbook</small></div>
+              )}
+            </div>
           </div>
-          {report.stress_test ? (
-            <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> Tested on {fmt(report.stress_test.storms)} new storms</span><b>Works in {fmt(report.stress_test.works)}</b><small>{report.stress_test.worst}{report.stress_test.seconds ? ` · ran in ${Math.round(report.stress_test.seconds)} s on ${report.stress_test.cores} LinuxONE cores` : ''}</small></div>
-          ) : (
-            <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> 1,000-storm stress test</span>
-              <b>{report.stress_test_progress?.status === 'running' ? `Testing… ${fmt(report.stress_test_progress.done ?? 0)} of ${fmt(report.stress_test_progress.storms ?? 1000)}` : 'Runs on LinuxONE'}</b>
-              <small>Your plan on storms generated from real Dallas cold spells (2005–2026), against the 2021 playbook</small></div>
-          )}
+          <Outcomes r={report} />
         </div>
         {linkKind === 'mock' && <p className="center muted small">Mock numbers for the screen. The real report comes from GET /api/report.</p>}
       </div>

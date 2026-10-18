@@ -122,6 +122,9 @@ def template_summary(scores, turning_points):
             f"({_versus(real['cold_person_hours'], mine)}) and the AI playing alone had {ai['cold_person_hours']:,} "
             f"({_versus(ai['cold_person_hours'], mine)}). Your longest outage lasted {you['longest_outage_min']:,} "
             f"minutes and critical buildings were dark for {you['critical_dark_min']:,} minutes in total.")
+    if real["cold_person_hours"] and not you.get("grid_collapsed"):
+        deaths = round(22 * mine / real["cold_person_hours"])  # report.estimated_deaths: DSHS's 22, scaled
+        text += (f" That is about {deaths} estimated deaths in Dallas County, against the 22 the state confirmed in 2021.")
     if you.get("grid_collapsed"):
         text = "The grid collapsed and the game ended early. " + text
     if turning_points:

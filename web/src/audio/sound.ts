@@ -118,7 +118,9 @@ class SoundSystem {
   private pendingPing: NoticeKind | null = null;
   private readonly seen = new Set<string>();
   private amb: { phase: Phase | null; snow: number; at: number } = { phase: null, snow: -1, at: -Infinity };
-  private readonly last = { tick: -1e9, select: -1e9, cut: -1e9, restore: -1e9, bell: -1e9, ping: -1e9 };
+  private readonly last = { tick: -1e9, select: -1e9, cut: -1e9, restore: -1e9, bell: -1e9, ping: -1e9, order: -1e9 };
+  /** the cut order the last alert sounded for; a new alert needs a real jump above it */
+  private alertedOrder = 0;
 
   constructor(store: SoundStore) {
     this.store = store;
@@ -285,10 +287,19 @@ class SoundSystem {
     }
 
     let delay = 0;
+    // the grid operator: an alert when cuts begin, and again when the order jumps 200 MW past the last alert
+    const order = cur.order_mw ?? 0;
+    if (order <= 0) this.alertedOrder = 0;
+    else if (now - this.last.order > 2500 && (this.alertedOrder === 0 || order - this.alertedOrder >= 200)) {
+      s.order(s.at(), this.alertedOrder === 0);
+      this.last.order = now;
+      this.alertedOrder = order;
+      delay = 0.5;
+    }
     const { cuts, restores } = diffCircuits(cur.circuits, prev.circuits);
     if (cuts && now - this.last.cut > 200) {
       this.last.cut = now;
-      s.cut(s.at(), cuts);
+      s.cut(s.at(delay), cuts);
       delay = 0.25;
     }
     let restored = false;
