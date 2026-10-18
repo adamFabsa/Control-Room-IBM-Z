@@ -49,7 +49,9 @@ Everything that thinks runs on an IBM LinuxONE Community Cloud VM in Podman cont
 | Hardware | IBM z17 (machine type 9175), s390x, 3 cores; on-chip AI accelerator (Telum II, `nnpa`) and CPACF crypto (`msa`) |
 | Containers | `server` (FastAPI game server, game engine, M1, M2), `db` (PostgreSQL 16), `llm` (llama.cpp with IBM Granite), `ai` (training jobs) |
 | Live evidence | `GET /api/ai` on the game server returns the hardware and every AI part's measured numbers; captured outputs in [docs/EVIDENCE.md](docs/EVIDENCE.md) |
-| Diagrams | System architecture, solution flow and data-to-AI pipeline in Mermaid: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Diagrams | System architecture, solution flow and data-to-AI pipeline: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| Screenshots | The VM, its containers, the AI models, security and the live game: [docs/EVIDENCE.md#screenshots](docs/EVIDENCE.md#screenshots) |
+| Datasets | Every data file, its source, rows and use: [docs/DATASET.md](docs/DATASET.md) |
 
 ### The AI parts
 

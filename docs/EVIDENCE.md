@@ -4,6 +4,34 @@ For the video, `bash ~/control-room/scripts/linuxone_tour.sh` on the VM prints t
 
 Captured from the team's IBM LinuxONE Community Cloud VM on Sun Oct 18 09:03:20 AM UTC 2026. Every block shows the command that produced it, so it can be re-run and screenshotted. The live game: http://148.100.98.237:8000/ · the same numbers, live: `curl http://148.100.98.237:8000/api/ai`.
 
+## Screenshots
+
+Captured on Oct 18, 2026 from the team's IBM LinuxONE Community Cloud VM (148.100.98.237) and the live game it serves.
+
+**The VM: machine, containers and the three AI models** (`bash ~/control-room/scripts/linuxone_tour.sh`, real output)
+
+![LinuxONE tour, part 1](screenshots/linuxone-tour-1-machine-containers-ai.png)
+
+**Security and the live game** (same run)
+
+![LinuxONE tour, part 2](screenshots/linuxone-tour-2-security-live-game.png)
+
+**Live AI numbers from the server on LinuxONE** (http://148.100.98.237:8000/api/ai)
+
+![/api/ai](screenshots/linuxone-api-ai.png)
+
+**The game's API, served from the VM** (http://148.100.98.237:8000/docs)
+
+![API docs](screenshots/linuxone-api-docs.png)
+
+**The game, live on LinuxONE** (the LINUXONE badge at top left; M2's pick and IBM Granite's alert on a decision card)
+
+![The game on LinuxONE](screenshots/game-live-on-linuxone.png)
+
+**The report after a storm** (estimated deaths against 2021, hours in cold homes)
+
+![The report](screenshots/game-report.png)
+
 ## 1. The machine: IBM z17, on-chip AI accelerator (Telum II, `nnpa`), CPACF crypto (`msa`)
 
 ```

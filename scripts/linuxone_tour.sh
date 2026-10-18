@@ -32,7 +32,8 @@ row('M2 what-if (Snap ML)', f"runs on {m2['server_backend']}, {t['telum']['singl
 row('', f"same answers as the CPU (max difference {t['agreement']['max_abs_diff_cold_person_hours']}), "
         f"{m2['dark_accuracy']:.1%} accurate on critical buildings")
 row('M3 analyst (Granite)', m3['model'])
-row('', f"{m3['accepted']} of {m3['requests']} texts passed the number check, {m3['tokens_per_sec']} tokens/s on 3 cores")
+row('', f"{m3['accepted']} of {m3['requests']} texts passed the number check, {m3['tokens_per_sec']} tokens/s on 3 cores"
+        if m3['requests'] else "no texts written yet since the server started")
 PY
 )"
 podman logs control-room_server_1 2>&1 | grep -m1 "M2 backend" | sed "s/^/  ${D}log: /; s/\$/${R}/"
