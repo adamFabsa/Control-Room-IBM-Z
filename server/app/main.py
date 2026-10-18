@@ -93,6 +93,11 @@ async def post_action(action: dict = Body(...)):
 async def get_report():
     # Snapshot on the event loop so the clock can't change the game mid-read; baselines run in a thread.
     session.finish()
+    job = session.job
+    for _ in range(100):  # just after the storm: up to 20 s for the turning points and the summary's facts
+        if job.task is None or job.summary is not None or job.task.done():
+            break
+        await asyncio.sleep(0.2)
     snapshot = session.snapshot()
     base = await asyncio.to_thread(baselines, session.storm, session.seed)
     return build_report(snapshot, base, session.job)

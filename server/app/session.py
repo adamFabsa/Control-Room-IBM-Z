@@ -30,6 +30,7 @@ class GameSession:
         self.event_text = {}  # event id -> Granite's rewrite of the card
         self.event_pick = {}  # event id -> M2's pick and predictions
         self.temps = []  # hourly outside °F during the storm, for M1
+        self.timed_cuts = {}  # circuit id -> engine step when the server restores it (cut with "minutes")
         self._demand = (None, None)  # (hour, M1 demand) cache
         self.storm, self.seed = storm, seed
         self.game = Game(storm=storm, seed=seed)
@@ -51,6 +52,11 @@ class GameSession:
                 self.temps.append(s["outside_f"])
                 self._demand = (hour, round(self.forecast.dallas_mw(s, self.temps)))
             s["demand_mw"], s["demand_source"] = self._demand[1], "M1"
+        step = s.get("step", self.steps)
+        for c in s["circuits"]:
+            due = self.timed_cuts.get(c["id"], self.timed_cuts.get(c.get("parent")))
+            if due is not None and not c["on"]:
+                c["restore_in_min"] = max(0, (due - step) * 5)
         event = s.get("event")
         if event and self.event_text.get(event["id"]):
             event["ai_text"] = self.event_text[event["id"]]
@@ -62,6 +68,8 @@ class GameSession:
                 for option in event["options"]:
                     option["ai_pick"] = option["id"] == pick["option"]
                     option["m2"] = pick["predictions"].get(option["id"])
+        if s["phase"] == "prepare":
+            s["phase"] = "ready"  # the screens call Get ready "ready"
         return s
 
     def snapshot(self):
@@ -89,19 +97,36 @@ class GameSession:
         elif kind == "new_game":
             self.new_game(action.get("storm", "uri2021"), int(action.get("seed", 42)))
         else:
-            before = self.game.state()
-            event = before.get("event") if kind == "choose" else None
-            self.game.apply(action)
-            # the engine's own step counter when it has one, so replays line up exactly
-            entry = {"step": before.get("step", self.steps), "action": action}
-            if event:  # for turning-point labels
-                entry["option_label"] = next((o["label"] for o in event["options"] if o["id"] == action.get("option")), None)
-            self.log.append(entry)
+            step = self._engine_action(action)
             if kind == "start_storm":
                 self.paused = False
-            if kind in ("cut", "restore"):
-                self._spawn(self._recount(action["circuit"]))
+            if kind == "cut" and action.get("minutes"):  # a timed cut: the server restores it later
+                self.timed_cuts[action["circuit"]] = step + max(1, round(float(action["minutes"]) / 5))
+            elif kind in ("cut", "restore"):
+                self.timed_cuts.pop(action["circuit"], None)
         await self.broadcast()
+
+    def _engine_action(self, action):
+        """Apply an action to the engine and log it for replays; returns the engine step it happened at."""
+        before = self.game.state()
+        event = before.get("event") if action["type"] == "choose" else None
+        self.game.apply(action)
+        # the engine's own step counter when it has one, so replays line up exactly
+        entry = {"step": before.get("step", self.steps), "action": action}
+        if event:  # for turning-point labels
+            entry["option_label"] = next((o["label"] for o in event["options"] if o["id"] == action.get("option")), None)
+        self.log.append(entry)
+        if action["type"] in ("cut", "restore"):
+            self._spawn(self._recount(action["circuit"]))
+        return entry["step"]
+
+    def _restore_due(self, step):
+        for circuit_id in [cid for cid, due in self.timed_cuts.items() if due <= step]:
+            del self.timed_cuts[circuit_id]
+            try:
+                self._engine_action({"type": "restore", "circuit": circuit_id})
+            except Exception:
+                log.warning("timed restore of %s failed", circuit_id)
 
     def _spawn(self, coro):
         task = asyncio.create_task(coro)
@@ -142,6 +167,7 @@ class GameSession:
                     stepped = True
                     s = self.game.state()
                     self.history.append({"time": s["time"], "people_cold": s["totals"]["people_cold"]})
+                    self._restore_due(s.get("step", self.steps))
                     if s["phase"] != "storm" or s.get("event"):
                         owed = 0.0
                         self.finish()

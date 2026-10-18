@@ -9,6 +9,7 @@ from functools import lru_cache
 
 from . import analyst, jobs
 from .engine import Game
+from .m2 import effective_cph
 from .players import ai_player_name, play_out, player, run_official
 
 log = logging.getLogger("controlroom.report")
@@ -76,10 +77,26 @@ class ReportJob:
                 self.summary, self.summary_source = f"{self.summary} {tip}", "granite"
 
 
+PLAN_NAMES = {"protect": "Protect {}", "generator": "A generator at {}", "warming_center": "A warming center at {}",
+              "keep_gas": "Keep gas flowing at {}", "conservation": "A conservation alert", "repair_crews": "Repair crews ready",
+              "smart_switch": "Smart switches on {}"}
+
+
+def _stress_for_screen(stress):
+    """The screen's shape {storms, works, worst: text}, once the test is done; None while it runs."""
+    if stress.get("status") != "done":
+        return None
+    w = stress["worst"]
+    worst = (f"Hardest storm (#{w['seed']}): the grid collapsed with your plan" if w.get("collapsed") else
+             f"Hardest storm (#{w['seed']}): {w['raw_cold_person_hours']:,} cold person-hours with your plan, "
+             f"{w['raw_playbook_cold_person_hours']:,} with the 2021 playbook")
+    return {**stress, "works": stress["wins"], "worst": worst, "worst_storm": w}
+
+
 def build_report(snapshot, base, job):
     you = _hourly(snapshot["history"])
     axis = base["real_2021"]["hourly"]
-    return {
+    report = {
         "storm": snapshot["storm"],
         "seed": snapshot["seed"],
         "phase": snapshot["phase"],
@@ -100,5 +117,20 @@ def build_report(snapshot, base, job):
         "turning_points_run": job.turning_points_run,
         "summary": job.summary,
         "summary_source": job.summary_source,
-        "stress_test": job.stress,
+        "stress_test_progress": job.stress,
     }
+    # The screens' names for the same data (web/src/contracts.ts Report).
+    you_score, real_score = snapshot["score"], base["real_2021"]["score"]
+    report["scores"].update({"player": you_score, "playbook_2021": real_score})
+    report["beat_playbook"] = effective_cph(you_score) < effective_cph(real_score)
+    report["cold_people_by_hour"] = {"t": report["chart"]["time"], "playbook_2021": report["chart"]["real_2021"],
+                                     "ai_alone": report["chart"]["ai_alone"], "player": report["chart"]["you"]}
+    report["plan"] = [PLAN_NAMES.get(a["item"], a["item"]).format(a.get("target") or "") for a in report["winter_plan"]]
+    for tp in report["turning_points"]:
+        steps = snapshot["history"]
+        tp["time"] = steps[tp["step"] - 1]["time"] if 0 < tp["step"] <= len(steps) else None
+        tp["delta_cold_person_hours"] = -tp["cold_person_hours_change"]  # what the decision did; < 0 saved hours
+    stress = _stress_for_screen(job.stress)
+    if stress:
+        report["stress_test"] = stress
+    return report

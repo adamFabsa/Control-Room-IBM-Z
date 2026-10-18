@@ -127,11 +127,10 @@ def run_storm(seed, plan, operator, with_baseline):
     baseline = None
     if with_baseline:
         official = run_official("playbook_2021", "generated", seed)
-        if official:
-            baseline = effective_cph(official[0])
-        else:
-            baseline = effective_cph(play_out(Game(storm="generated", seed=seed), PLAYERS["playbook_2021"])[0].score())
-    return seed, effective_cph(game.score()), baseline, bool(game.score().get("grid_collapsed"))
+        played = official[0] if official else play_out(Game(storm="generated", seed=seed), PLAYERS["playbook_2021"])[0].score()
+        baseline = (effective_cph(played), played["cold_person_hours"])
+    score = game.score()
+    return seed, effective_cph(score), baseline, bool(score.get("grid_collapsed")), score["cold_person_hours"]
 
 
 async def stress_test(plan, operator, status, baselines):
@@ -144,14 +143,15 @@ async def stress_test(plan, operator, status, baselines):
                for seed in range(1, STRESS_STORMS + 1)]
     wins, collapses, worst = 0, 0, None
     for future in asyncio.as_completed(futures):
-        seed, cph, baseline, collapsed = await future
+        seed, cph, baseline, collapsed, raw = await future
         collapses += collapsed
         if baseline is not None:
             baselines[seed] = baseline
-        baseline = baselines[seed]
+        baseline, raw_baseline = baselines[seed]
         wins += cph < baseline
         if worst is None or cph > worst["cold_person_hours"]:
-            worst = {"seed": seed, "cold_person_hours": cph, "playbook_cold_person_hours": baseline}
+            worst = {"seed": seed, "cold_person_hours": cph, "playbook_cold_person_hours": baseline, "collapsed": collapsed,
+                     "raw_cold_person_hours": raw, "raw_playbook_cold_person_hours": raw_baseline}
         status["done"] += 1
         status["wins"] = wins
         status["collapses"] = collapses

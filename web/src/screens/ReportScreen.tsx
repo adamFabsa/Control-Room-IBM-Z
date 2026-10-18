@@ -55,7 +55,16 @@ export function ReportScreen() {
 
   useEffect(() => {
     if (linkKind === 'mock') { setReport(mockReport(cph)); return; }
-    fetch('/api/report').then((r) => r.json()).then(setReport).catch(() => setReport(mockReport(cph)));
+    // The server fills in the AI analyst's tip and the 1,000-storm test over about 2 minutes: re-fetch until done.
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const load = () => fetch('/api/report').then((r) => r.json()).then((r: Report) => {
+      if (stopped) return;
+      setReport(r);
+      if (!r.stress_test) timer = setTimeout(load, 4000);
+    }).catch(() => { if (!stopped) setReport(mockReport(cph)); });
+    load();
+    return () => { stopped = true; clearTimeout(timer); };
   }, [linkKind, cph]);
 
   if (!report) return <div className="report-wrap"><div className="panel report">Loading the report…</div></div>;
