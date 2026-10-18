@@ -93,7 +93,7 @@ export function startVoice(store: VoiceStore): () => void {
     if (cur.phase === 'storm' && cur.order_mw > 0 && !(prev && prev.order_mw > 0)) once('order', 'order');
     if (cur.event && cur.event.id !== prev?.event?.id) once(`card-${cur.event.id}`, 'card');
     for (const n of cur.notices ?? []) {
-      if (n.id.startsWith('order-short')) once('short', 'short');
+      if (n.id.startsWith('order-short') || n.id.startsWith('order-hold')) once('short', 'short');
       if (n.kind === 'cold') once('cold', 'cold');
     }
     if (cur.phase === 'over' && prev?.phase === 'storm') setTimeout(() => once('report', 'report'), 2500);

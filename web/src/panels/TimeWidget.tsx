@@ -35,7 +35,8 @@ export function TimeWidget({ compact = false }: { compact?: boolean }) {
   const face = SKY[phase];
   const t12 = clock ? clock12(clock.time) : null;
   const fast = useStore((s) => !!s.state?.fast_forward);
-  const status = eventOpen ? 'decide' : paused ? 'paused' : fast ? 'fast' : 'live';
+  const held = useStore((s) => !!s.state?.hold);
+  const status = eventOpen ? 'decide' : held ? 'hold' : paused ? 'paused' : fast ? 'fast' : 'live';
   const link = linkKind === 'mock' ? 'MOCK' : connected ? 'LINUXONE' : 'OFFLINE';
 
   return (
@@ -96,7 +97,7 @@ export function TimeWidget({ compact = false }: { compact?: boolean }) {
             className={`gbtn play-btn${paused ? ' ice' : ''}`}
             aria-label={paused ? 'Play' : 'Pause'}
             disabled={eventOpen}
-            title={eventOpen ? 'Decide on the card first' : `${paused ? 'Play' : 'Pause'} · Space`}
+            title={eventOpen ? 'Decide on the card first' : held ? 'Go on without cutting · Space' : `${paused ? 'Play' : 'Pause'} · Space`}
             onClick={() => send({ type: paused ? 'play' : 'pause' })}
           >
             {paused ? <Play size={20} fill="currentColor" strokeWidth={2} /> : <Pause size={20} fill="currentColor" strokeWidth={2} />}
@@ -118,7 +119,7 @@ export function TimeWidget({ compact = false }: { compact?: boolean }) {
           </div>
           <span className={`tw-status ${status}`} role="status">
             <span className="dot" />
-            {status === 'decide' ? 'DECIDE' : status === 'paused' ? 'PAUSED' : status === 'fast' ? 'FAST-FORWARD' : 'LIVE'}
+            {status === 'decide' ? 'DECIDE' : status === 'hold' ? 'CUT NOW' : status === 'paused' ? 'PAUSED' : status === 'fast' ? 'FAST-FORWARD' : 'LIVE'}
           </span>
         </div>
       )}

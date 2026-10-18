@@ -1,4 +1,4 @@
-import { Check, Flame, Megaphone, UtilityPole, Zap } from 'lucide-react';
+import { Check, CirclePause, Flame, Megaphone, Play, UtilityPole, Zap } from 'lucide-react';
 import { useStore } from '../store';
 import { fmt } from '../format';
 
@@ -7,6 +7,8 @@ export function OrderBar() {
   const cut = useStore((s) => s.state?.cut_mw ?? 0);
   const gas = useStore((s) => s.state?.effects?.gas_multiplier ?? 1);
   const conservation = useStore((s) => !!s.state?.effects?.conservation);
+  const hold = useStore((s) => s.state?.hold);
+  const send = useStore((s) => s.send);
   const ghost = useStore((s) => {
     const h = s.ui.hover;
     if (!h || !s.state) return 0;
@@ -41,7 +43,7 @@ export function OrderBar() {
   const tone = met ? 'met' : diff < 0 ? 'short' : 'over';
 
   return (
-    <div className={`panel order-bar ${tone} pop`}>
+    <div className={`panel order-bar ${tone}${hold ? ' held' : ''} pop`}>
       <div className="ob-top">
         <span className="ob-icon" aria-hidden="true"><Zap size={24} strokeWidth={2.2} fill="currentColor" fillOpacity={0.25} /></span>
         <div className="ob-text">
@@ -82,6 +84,18 @@ export function OrderBar() {
         {gas > 1 && <span className="chip warn"><Flame size={12} strokeWidth={2.6} /> Gas ×{gas.toFixed(2)}</span>}
         {conservation && <span className="chip"><Megaphone size={12} strokeWidth={2.6} /> Conservation on</span>}
       </div>
+      {hold && (
+        <div className="ob-hold" role="alert">
+          <span className="ob-hold-ico" aria-hidden="true"><CirclePause size={20} strokeWidth={2.4} /></span>
+          <span className="ob-hold-text">
+            <b>Clock stopped: the grid is at risk.</b>
+            {hold.cut_more_mw > 0 ? <> Cut <b>{fmt(hold.cut_more_mw)} MW</b> more on the map and it starts again.</> : ' Starting again…'}
+          </span>
+          <button type="button" className="gbtn ob-hold-go" title="Go on without cutting · Space" onClick={() => send({ type: 'play' })}>
+            <Play size={13} fill="currentColor" strokeWidth={2} /> Go on anyway
+          </button>
+        </div>
+      )}
     </div>
   );
 }

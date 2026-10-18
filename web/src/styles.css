@@ -152,6 +152,8 @@ kbd {
 .tw-status.live { color: var(--ice); }
 .tw-status.live .dot { animation: pulse 1.8s ease-out infinite; }
 .tw-status.paused, .tw-status.decide { color: var(--amber); }
+.tw-status.hold { color: var(--cold); }
+.tw-status.hold .dot { animation: pulse 0.9s ease-out infinite; }
 .tw-status.fast { color: var(--good); }
 .tw-status.fast .dot { animation: pulse 0.6s ease-out infinite; }
 @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(124, 196, 250, 0.7); } 100% { box-shadow: 0 0 0 8px rgba(124, 196, 250, 0); } }
@@ -189,6 +191,19 @@ kbd {
 .status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; font: 700 12.5px/1 var(--sans); white-space: nowrap; }
 .status-pill.met { background: var(--ice); color: var(--ink); }
 .status-pill.short { background: var(--amber); color: var(--ink-warm); }
+.order-bar.held { box-shadow: var(--shadow), 0 0 0 2px var(--cold); animation: ob-held 1.6s ease-in-out infinite; }
+@keyframes ob-held { 50% { box-shadow: var(--shadow), 0 0 0 2px var(--cold), 0 0 26px -4px var(--cold); } }
+.ob-hold {
+  display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 10px 9px 12px;
+  border-radius: 12px; background: rgba(255, 122, 69, 0.14); border: 1px solid rgba(255, 122, 69, 0.45);
+  font-size: 13px; line-height: 1.35; animation: ob-hold-in 0.35s var(--spring) both;
+}
+@keyframes ob-hold-in { from { opacity: 0; transform: translateY(-6px) scale(0.97); } }
+.ob-hold-ico { color: var(--cold); display: grid; place-items: center; flex: none; }
+.ob-hold-text { flex: 1; min-width: 0; }
+.ob-hold-text > b:first-child { display: block; color: var(--cold); }
+.ob-hold-go { flex: none; font-size: 12px; padding: 6px 10px; gap: 5px; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .order-bar.held, .ob-hold { animation: none; } }
 .status-pill.over { background: rgba(247, 200, 115, 0.18); color: var(--window); }
 .ob-preview b { color: #fff; font-family: var(--mono); font-weight: 500; }
 
@@ -609,7 +624,7 @@ kbd {
 .camera-widget .cam-mute { grid-column: 5; grid-row: 1; }
 .camera-widget .cam-voice { grid-column: 5; grid-row: 2; }
 .cam-voice[aria-pressed='true'] { color: var(--ice); }
-.cam-mute[aria-pressed='true'] { color: var(--muted); }
+.cam-mute[aria-pressed='true'] { color: var(--cold); background: rgba(255, 122, 69, 0.14); }
 
 /* AI on the decision card and the report (server fields: event.ai_text, option.m2, turning_points) */
 .dc-ai { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 9px 11px; border-radius: 10px; background: rgba(124, 196, 250, 0.1); color: #dfeefc; font-size: 13px; line-height: 1.4; }

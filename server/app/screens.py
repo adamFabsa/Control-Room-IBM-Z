@@ -88,6 +88,10 @@ class Notices:
         else:
             self._add("order", f"{event['title']} Cut more neighborhoods to meet it.", s, "order")
 
+    def hold(self, s, short):
+        self._add("order", f"Clock stopped: you are {short:,} MW short of the order. Cut more neighborhoods to go on.",
+                  s, "hold")
+
     def restored(self, s, circuit_id, area):
         self._add("restore", f"{area} ({circuit_id}) is back on, as you scheduled.", s, circuit_id)
 

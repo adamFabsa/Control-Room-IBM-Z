@@ -93,7 +93,8 @@ def label(entry, history):
 
 async def turning_points(storm, seed, log, score, history, top=3):
     """The `top` decisions whose removal changes cold person-hours the most."""
-    candidates = [i for i, e in enumerate(log) if e["action"]["type"] in DECISIONS]
+    # the player's decisions only: not routine cards the server let pass with their do-nothing option
+    candidates = [i for i, e in enumerate(log) if e["action"]["type"] in DECISIONS and not e.get("passed")]
     if len(candidates) > MAX_REPLAYS:  # keep every buy and choice, thin out cuts and restores evenly
         firm = [i for i in candidates if log[i]["action"]["type"] not in ("cut", "restore")]
         rest = [i for i in candidates if i not in firm]
@@ -160,7 +161,7 @@ async def stress_test(plan, operator, status, baselines):
         if baseline is not None:
             baselines[seed] = baseline
         baseline, raw_baseline = baselines[seed]
-        wins += cph < baseline
+        wins += not collapsed and cph < baseline  # a collapse never counts as working
         if worst is None or cph > worst["cold_person_hours"]:
             worst = {"seed": seed, "cold_person_hours": cph, "playbook_cold_person_hours": baseline, "collapsed": collapsed,
                      "raw_cold_person_hours": raw, "raw_playbook_cold_person_hours": raw_baseline}

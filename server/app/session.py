@@ -12,17 +12,27 @@ from .screens import Notices, decorate
 
 log = logging.getLogger("controlroom")
 
-# Pacing: the storm (114 game hours) takes about 2 minutes at the starting speed, about 1 at speed 4.
-SECONDS_PER_GAME_HOUR = {1: 5, 2: 2.5, 3: 1, 4: 0.5, 5: 0.25}
+# Pacing: the storm is 114 game hours. At the starting speed it plays in about 4 to 5 minutes with 15 or so
+# decisions (speed 4: about 4 minutes, speed 5: about 3), measured with a human-paced player on the real engine.
+SECONDS_PER_GAME_HOUR = {1: 5, 2: 3, 3: 1.5, 4: 1, 5: 0.5}
 START_SPEED = 3
-# Quick play (the default) keeps the player in charge without a card every game hour: the clock fast-forwards while
-# there is no cut order and every neighborhood has power, and routine cards (order rose, a small shortfall, homes
-# getting cold) don't stop the game. They take their do-nothing option, so nothing is done for the player, and
-# become a notice saying what to do. Cards that stop the game: a cut that would darken a critical building, ice
-# or fuel emergencies, and a shortfall deep enough to threaten a collapse. "quick": false shows every card.
+# Quick play (the default) keeps the player in charge without a card every game hour. The clock fast-forwards while
+# there is no cut order and every neighborhood has power. Cards that stop the game: a cut that would darken a
+# critical building, ice and fuel emergencies, the first order rise and then one every 3 game hours, a shortfall
+# past 10% of the order, and homes getting cold at most every 6 game hours. The rest take their do-nothing option
+# (nothing is done for the player) and become a notice saying what to do. "quick": false shows every card.
 QUICK_DEFAULT = os.environ.get("CONTROLROOM_QUICK", "1") == "1"
-QUIET_SECONDS_PER_GAME_HOUR = 0.1
-SEVERE_SHORTFALL = 0.2  # of the order; the grid collapses at 30% short for 30 minutes
+QUIET_SECONDS_PER_GAME_HOUR = 0.4
+SHORT_STOP = 0.1  # of the order: a "you are short" card past this stops the game
+ORDER_STOP_GAP = 36  # engine steps (3 game hours) between order-rise cards that stop the game
+COLD_STOP_GAP = 72  # 6 game hours between "getting cold" cards that stop the game
+# The grid collapses when the cut stays 30% short for 30 game minutes, faster than anyone can react at speed, and
+# the engine's own shortfall card has a cooldown. So past 20% short the clock stops and the order bar says how much
+# to cut; it starts again once the player's cuts bring the gap under 10%. Nothing is cut for the player, and "play"
+# goes on anyway (no stop for the next game hour).
+HOLD_SHORTFALL = 0.2
+RESUME_SHORTFALL = 0.1
+HOLD_GRACE_STEPS = 12
 STEPS_PER_GAME_HOUR = 12  # step() advances 5 game minutes
 TICK_S = 0.1  # at most 10 state messages a second
 
@@ -52,6 +62,10 @@ class GameSession:
         self.paused = True
         self.speed = 2
         self.steps = 0
+        self.hold = False  # the clock is stopped for a dangerous shortfall
+        self.hold_ok_at = 0  # engine step from which the clock may stop for a shortfall again
+        self.stop_for = {}  # event id -> does it stop the game (decided once per card)
+        self.last_stop = {}  # card kind -> engine step it last stopped the game
         self.log = []  # {"step", "action"} for every engine action, used to replay the game
         self.history = []  # per-step totals for the report chart
 
@@ -92,6 +106,10 @@ class GameSession:
         s["notices"] = list(self.notices.items)
         s["quick"] = self.quick
         s["fast_forward"] = self._quiet(s) and not self.paused
+        if self.hold and s["phase"] == "storm":
+            short = max(0, s["order_mw"] - s["cut_mw"])
+            s["hold"] = {"short_mw": round(short), "order_mw": round(s["order_mw"]),
+                         "cut_more_mw": round(max(0, short - RESUME_SHORTFALL * s["order_mw"]))}
         if s["phase"] == "prepare":
             s["phase"] = "ready"  # the screens call Get ready "ready"
         return s
@@ -127,8 +145,12 @@ class GameSession:
         kind = action["type"]
         if kind == "pause":
             self.paused = True
+            self.hold = False
         elif kind == "play":
             self.paused = False
+            if self.hold:  # going on without cutting: no stop for the next game hour
+                self.hold = False
+                self.hold_ok_at = self.game.state().get("step", self.steps) + HOLD_GRACE_STEPS
         elif kind == "speed":
             value = int(action["value"])
             if value not in SECONDS_PER_GAME_HOUR:
@@ -145,6 +167,7 @@ class GameSession:
                 self.paused = False
                 self.speed = START_SPEED
             self._defer_routine()
+            self._resume_if_covered()
             if kind == "cut" and action.get("minutes"):  # a timed cut: the server restores it later
                 self.timed_cuts[action["circuit"]] = step + max(1, round(float(action["minutes"]) / 5))
             elif kind in ("cut", "restore"):
@@ -156,15 +179,51 @@ class GameSession:
         return self.quick and s["phase"] == "storm" and s["order_mw"] == 0 and all(c["on"] for c in s["circuits"])
 
     def _stops(self, event, s):
-        """Does this card stop the game for the player? In quick play only the decisions that matter do."""
-        if not self.quick:
-            return True
-        kind = event.get("kind")
-        if kind in ("critical_cut", "ice", "fuel"):  # a hospital, water plant or gas station at risk
-            return True
-        if kind == "short":
-            return s["order_mw"] - s["cut_mw"] > SEVERE_SHORTFALL * s["order_mw"]
-        return False
+        """Does this card stop the game for the player? In quick play only the decisions that matter do.
+        Decided once per card, so the gaps between stops count from cards the player actually saw."""
+        if event["id"] in self.stop_for:
+            return self.stop_for[event["id"]]
+        kind, step = event.get("kind"), s.get("step", self.steps)
+        since = step - self.last_stop.get(kind, -10**6)
+        if not self.quick or kind in ("critical_cut", "ice", "fuel"):  # a hospital, water plant or gas station at risk
+            stops = True
+        elif kind == "short":
+            stops = s["order_mw"] - s["cut_mw"] > SHORT_STOP * s["order_mw"]
+        elif kind == "order_rise":
+            stops = since >= ORDER_STOP_GAP
+        elif kind == "cold":
+            stops = since >= COLD_STOP_GAP
+        else:
+            stops = False
+        self.stop_for[event["id"]] = stops
+        if stops:
+            self.last_stop[kind] = step
+        return stops
+
+    def _short_of_order(self, s):
+        return s["order_mw"] - s["cut_mw"] if s["phase"] == "storm" and s["order_mw"] > 0 else 0
+
+    def _hold_if_short(self, s):
+        """Stop the clock when the cut is dangerously short and no card is open. True if it stopped."""
+        if self.hold or s.get("event") or s.get("step", self.steps) < self.hold_ok_at:
+            return False
+        short = self._short_of_order(s)
+        if short <= HOLD_SHORTFALL * s["order_mw"]:
+            return False
+        self.hold = True
+        self.paused = True
+        self.notices.hold(s, round(short))
+        return True
+
+    def _resume_if_covered(self):
+        """The player's cuts brought the shortfall back under control: start the clock again."""
+        if not self.hold:
+            return
+        s = self.game.state()
+        if s["phase"] != "storm" or self._short_of_order(s) <= RESUME_SHORTFALL * s["order_mw"]:
+            self.hold = False
+            self.paused = s["phase"] != "storm"
+            self.hold_ok_at = s.get("step", self.steps) + 2
 
     def _defer_routine(self):
         """Quick play: routine cards take their do-nothing option (the last one; nothing is done for the player),
@@ -176,15 +235,17 @@ class GameSession:
             if not event or self._stops(event, s):
                 break
             try:
-                self._engine_action({"type": "choose", "event": event["id"], "option": event["options"][-1]["id"]})
+                self._engine_action({"type": "choose", "event": event["id"], "option": event["options"][-1]["id"]},
+                                    passed=True)
             except Exception:
                 break
             self.notices.advise(s, event)
             deferred = True
         return deferred
 
-    def _engine_action(self, action):
-        """Apply an action to the engine and log it for replays; returns the engine step it happened at."""
+    def _engine_action(self, action, passed=False):
+        """Apply an action to the engine and log it for replays; returns the engine step it happened at.
+        `passed`: a routine card the server let go with its do-nothing option, not the player's choice."""
         before = self.game.state()
         event = before.get("event") if action["type"] == "choose" else None
         self.game.apply(action)
@@ -192,6 +253,8 @@ class GameSession:
         entry = {"step": before.get("step", self.steps), "action": action}
         if event:  # for turning-point labels
             entry["option_label"] = next((o["label"] for o in event["options"] if o["id"] == action.get("option")), None)
+        if passed:
+            entry["passed"] = True
         self.log.append(entry)
         if action["type"] in ("cut", "restore"):
             self._spawn(self._recount(action["circuit"]))
@@ -251,6 +314,9 @@ class GameSession:
                     self._restore_due(s.get("step", self.steps))
                     if s.get("event") and self._defer_routine():
                         s = self.game.state()
+                    if self._hold_if_short(s):
+                        owed = 0.0
+                        break
                     if s["phase"] != "storm" or s.get("event"):
                         owed = 0.0
                         self.finish()

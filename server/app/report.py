@@ -178,7 +178,8 @@ def build_report(snapshot, base, job, forecast=None):
     # The screens' names for the same data (web/src/contracts.ts Report).
     you_score, real_score = snapshot["score"], base["real_2021"]["score"]
     report["scores"].update({"player": you_score, "playbook_2021": real_score})
-    report["beat_playbook"] = effective_cph(you_score) < effective_cph(real_score)
+    # a collapsed grid never beats the playbook, however few cold hours it had when it ended
+    report["beat_playbook"] = not you_score.get("grid_collapsed") and effective_cph(you_score) < effective_cph(real_score)
     report["cold_people_by_hour"] = {"t": report["chart"]["time"], "playbook_2021": report["chart"]["real_2021"],
                                      "ai_alone": report["chart"]["ai_alone"], "player": report["chart"]["you"]}
     report["no_power_by_hour"] = {"t": report["chart"]["time"],

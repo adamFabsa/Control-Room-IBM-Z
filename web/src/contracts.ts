@@ -79,6 +79,8 @@ export interface GameState {
   weather?: { snow?: number };
   /** quick play: the clock is fast-forwarding (no cut order, every neighborhood has power) */
   fast_forward?: boolean;
+  /** the clock stopped because the cut is more than 20% short of the order; it starts again once the gap is under 10% */
+  hold?: { short_mw: number; order_mw: number; cut_more_mw: number };
   warming_centers?: string[];
   quick?: boolean;
 }

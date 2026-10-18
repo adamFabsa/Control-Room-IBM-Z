@@ -471,7 +471,7 @@ export function createMasterBus(ctx: BaseAudioContext, dest: AudioNode, volume: 
   const input = ctx.createGain();
   const warm = biquad(ctx, 'lowpass', 9000, 0.5); // take the edge off everything
   const comp = ctx.createDynamicsCompressor();
-  comp.threshold.value = -14;
+  comp.threshold.value = -8; // only stacked sounds reach it, so single sounds keep their punch
   comp.knee.value = 10;
   comp.ratio.value = 4;
   comp.attack.value = 0.003;

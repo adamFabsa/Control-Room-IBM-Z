@@ -15,9 +15,12 @@ export interface SoundStore {
   subscribe(listener: (s: SoundSnapshot, prev: SoundSnapshot) => void): () => void;
 }
 
-/** Master volume after the compressor. Event sounds peak around -13 dBFS, the storm wind sits near -30 dBFS RMS. */
-const VOLUME = 0.7;
-const STORAGE_KEY = 'control-room-uri:muted';
+/** Master volume after the compressor, and a lift for the event sounds before it. Measured in Chromium and WebKit:
+ *  event sounds peak around -7 dBFS, a button tick near -14, the storm wind about -24 dBFS RMS. */
+const VOLUME = 1.1;
+const EVENT_GAIN = 1.5;
+// a new key, so a mute saved by an older build (M is easy to hit by accident) doesn't silence the game for good
+const STORAGE_KEY = 'control-room-uri:sound-muted';
 const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend'] as const;
 
 // ------------------------------------------------------------------ mute (works with or without a running engine)
@@ -100,8 +103,8 @@ function placedCount(s: GameState): number {
 const pingKind = (k: NoticeKind): PingKind => (k === 'cold' || k === 'ice' ? 'cold' : k === 'restore' || k === 'repair' ? 'bright' : 'neutral');
 
 function moodFor(phase: Phase | null, snow: number): WindMood {
-  if (phase === 'storm') return { level: 0.65 + 0.35 * snow, center: 480 + 160 * snow, depth: 140 + 120 * snow, rumble: 0.7 + 0.5 * snow };
-  if (phase === 'ready') return { level: 0.55, center: 420, depth: 90, rumble: 0.3 }; // a clear day: barely a breeze
+  if (phase === 'storm') return { level: 0.85 + 0.45 * snow, center: 480 + 160 * snow, depth: 140 + 120 * snow, rumble: 0.7 + 0.5 * snow };
+  if (phase === 'ready') return { level: 0.8, center: 420, depth: 90, rumble: 0.3 }; // a clear day: a light breeze
   return { level: 0, center: 420, depth: 90, rumble: 0.3 };
 }
 
@@ -175,8 +178,10 @@ class SoundSystem {
 
   private onGesture = (): void => {
     this.gestureAt = performance.now();
-    if (!this.eng && !this.failed) this.boot();
+    const first = !this.eng && !this.failed;
+    if (first) this.boot();
     this.syncRun();
+    if (first) this.canPlay()?.select('restore', 0.05); // a soft "sound is on" the moment it can play
   };
 
   private onVisibility = (): void => this.syncRun();
@@ -190,7 +195,10 @@ class SoundSystem {
     try {
       const ctx = new Ctor({ latencyHint: 'interactive' });
       const bus = createMasterBus(ctx, ctx.destination, 0); // starts silent; syncRun fades it up
-      const synth = new Synth(ctx, bus.input);
+      const events = ctx.createGain();
+      events.gain.value = EVENT_GAIN;
+      events.connect(bus.input);
+      const synth = new Synth(ctx, events);
       const wind = new Wind(ctx, synth.noiseBuf, bus.input);
       this.eng = { ctx, bus, synth, wind };
     } catch {
@@ -294,10 +302,17 @@ class SoundSystem {
     }
 
     let delay = 0;
+    // the clock stopped for a dangerous shortfall: the operator's alert, whatever the last one was
+    const held = !!cur.hold && !prev.hold;
+    if (held) {
+      s.order(s.at(), true);
+      this.last.order = now;
+      delay = 0.5;
+    }
     // the grid operator: an alert when cuts begin, and again when the order jumps 200 MW past the last alert
     const order = cur.order_mw ?? 0;
     if (order <= 0) this.alertedOrder = 0;
-    else if (now - this.last.order > 2500 && (this.alertedOrder === 0 || order - this.alertedOrder >= 200)) {
+    else if (!held && now - this.last.order > 2500 && (this.alertedOrder === 0 || order - this.alertedOrder >= 200)) {
       s.order(s.at(), this.alertedOrder === 0);
       this.last.order = now;
       this.alertedOrder = order;
@@ -338,7 +353,8 @@ class SoundSystem {
     }
 
     // a timed restore already rang its chime; its "back on" notice needs no second sound
-    if (fresh && !(restored && pingKind(fresh) === 'bright')) this.ping(fresh, delay);
+    // and the hold's own notice is covered by its alert
+    if (fresh && !held && !(restored && pingKind(fresh) === 'bright')) this.ping(fresh, delay);
   }
 
   /** Remember every notice id; return the most important kind among the new ones. */
