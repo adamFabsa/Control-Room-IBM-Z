@@ -1,0 +1,119 @@
+// Shapes shared with the engine (Person 1) and server (Adam). See spec "Shared contracts".
+// Fields marked optional are 1B's requested additions; the UI works without them.
+
+export type Phase = 'ready' | 'storm' | 'over';
+
+export interface Circuit {
+  id: string;
+  area: string;
+  on: boolean;
+  protected: boolean;
+  dark_min: number;
+  indoor_f: number;
+  people: number;
+  mw: number;
+  split: boolean;
+  parent?: string;
+  broken?: boolean;
+  restore_in_min?: number | null;
+  medical?: number;
+}
+
+export interface Building {
+  id: string;
+  type: string;
+  circuit: string;
+  on: boolean;
+  generator: boolean;
+  protected: boolean;
+  at_risk?: boolean;
+  fuel_h?: number;
+}
+
+export interface EventOption {
+  id: string;
+  label: string;
+  ai_pick: boolean;
+}
+
+export interface GameEvent {
+  id: string;
+  title: string;
+  text: string;
+  options: EventOption[];
+  target?: string;
+}
+
+export type NoticeKind = 'cold' | 'order' | 'ice' | 'repair' | 'restore' | 'water' | 'gas' | 'info';
+
+export interface Notice {
+  id: string;
+  kind: NoticeKind;
+  text: string;
+  target?: string;
+  time?: string;
+}
+
+export interface GameState {
+  time: string;
+  phase?: Phase;
+  paused: boolean;
+  speed: number;
+  outside_f: number;
+  order_mw: number;
+  cut_mw: number;
+  points: number;
+  circuits: Circuit[];
+  buildings: Building[];
+  totals: { people_no_power: number; people_cold: number; cold_person_hours: number };
+  event: GameEvent | null;
+  copilot?: { tip: string; target?: string } | null;
+  effects?: { gas_multiplier?: number; boil_water_people?: number; conservation?: boolean };
+  prep?: { keep_gas?: boolean; conservation?: boolean; repair_crews?: boolean; warming_center?: boolean };
+  notices?: Notice[];
+  weather?: { snow?: number };
+}
+
+export type BuyItem =
+  | 'protect'
+  | 'generator'
+  | 'warming_center'
+  | 'keep_gas'
+  | 'conservation'
+  | 'repair_crews'
+  | 'smart_switch';
+
+export type EmergencyItem = 'generator' | 'warming_center' | 'conservation';
+
+export type Action =
+  | { type: 'buy'; item: BuyItem; target: string }
+  | { type: 'sell'; item: BuyItem; target: string }
+  | { type: 'start_storm' }
+  | { type: 'cut'; circuit: string; minutes?: number }
+  | { type: 'restore'; circuit: string }
+  | { type: 'emergency'; item: EmergencyItem; target?: string }
+  | { type: 'choose'; event: string; option: string }
+  | { type: 'pause' }
+  | { type: 'play' }
+  | { type: 'speed'; value: number };
+
+export interface ScoreSet {
+  cold_person_hours: number;
+  longest_outage_min?: number;
+  critical_dark_min?: number;
+  water_plants_lost?: number;
+  orders_met_pct?: number;
+  boil_water_person_hours?: number;
+}
+
+export interface Report {
+  storm: string;
+  beat_playbook?: boolean;
+  scores: { playbook_2021: ScoreSet; ai_alone: ScoreSet; player: ScoreSet };
+  cold_people_by_hour?: { t: string[]; playbook_2021: number[]; ai_alone: number[]; player: number[] };
+  turning_points?: { time: string; action: Action; delta_cold_person_hours: number }[];
+  summary?: string;
+  plan?: string[];
+  stress_test?: { storms: number; works: number; worst: string };
+  game_check?: string;
+}

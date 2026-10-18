@@ -1,0 +1,171 @@
+/* Map overlay: status markers, cartographic labels, the co-pilot pin. Positions come from MapOverlay.tsx. */
+.ov { position: absolute; inset: 0; z-index: 2; pointer-events: none; overflow: hidden; }
+.ov > div { position: absolute; left: 0; top: 0; will-change: transform; transition: opacity 160ms ease; }
+.ov .ov-hidden { opacity: 0; pointer-events: none; }
+.ov .ov-hidden * { pointer-events: none !important; }
+
+/* ---------- labels: map lettering, not pills ---------- */
+.ov-area, .ov-place { translate: -50% -50%; white-space: nowrap; pointer-events: none; user-select: none; }
+.ov-area {
+  font: 700 11px/1 var(--sans);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(244, 247, 251, 0.94);
+  text-shadow: 0 0 2px rgba(6, 11, 22, 0.95), 0 0 6px rgba(6, 11, 22, 0.8), 0 1px 2px rgba(6, 11, 22, 0.9);
+}
+.ov-place {
+  font: 500 10.5px/1 var(--sans);
+  letter-spacing: 0.05em;
+  color: rgba(214, 224, 236, 0.78);
+  text-shadow: 0 0 2px rgba(6, 11, 22, 0.95), 0 0 5px rgba(6, 11, 22, 0.7);
+}
+.ov-place.water { font-style: italic; color: rgba(165, 205, 240, 0.9); }
+.ov-place.campus, .ov-place.landmark { display: inline-flex; align-items: center; gap: 4px; }
+.ov-place.campus { font-weight: 700; font-size: 11px; letter-spacing: 0.04em; color: rgba(255, 214, 170, 0.95); }
+.ov-place.landmark { font-size: 10px; color: rgba(226, 232, 240, 0.85); }
+.ov-place.campus svg, .ov-place.landmark svg { flex: none; opacity: 0.9; }
+.ov-day .ov-area { color: rgba(22, 30, 44, 0.9); text-shadow: 0 0 2px rgba(255, 255, 255, 0.95), 0 0 6px rgba(255, 255, 255, 0.8); }
+.ov-day .ov-place { color: rgba(40, 50, 64, 0.72); text-shadow: 0 0 2px rgba(255, 255, 255, 0.95), 0 0 5px rgba(255, 255, 255, 0.7); }
+.ov-day .ov-place.water { color: rgba(34, 92, 150, 0.85); }
+.ov-day .ov-place.campus { color: rgba(128, 36, 30, 0.95); }
+.ov-day .ov-place.landmark { color: rgba(30, 40, 56, 0.85); }
+
+/* ---------- status markers ---------- */
+.ov-anchor { translate: -50% -100%; }
+.ov-marker {
+  --c: var(--ice);
+  display: flex; flex-direction: column; align-items: center; gap: 5px;
+  width: max-content; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto;
+  font: inherit; color: inherit;
+}
+.ov-pin {
+  position: relative; display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  color: var(--c);
+  background: radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--c) 32%, #1c2840) 0%, #0f1727 72%);
+  border: 2px solid var(--c);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 0 4px color-mix(in srgb, var(--c) 16%, transparent);
+  transition: transform 140ms ease, width 160ms ease, height 160ms ease;
+}
+.ov-pin::after {
+  content: ''; position: absolute; left: 50%; bottom: -8px; translate: -50% 0;
+  border: 5px solid transparent; border-top-color: var(--c);
+}
+.ov-marker:hover .ov-pin, .ov-marker.hover .ov-pin { transform: scale(1.12); }
+.ov-marker.selected .ov-pin { box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5), 0 0 0 3px var(--c), 0 0 22px var(--c); }
+
+/* powered: a quiet dot, so the county isn't covered in pins */
+.ov-marker.on .ov-pin {
+  width: 12px; height: 12px; border-width: 2px;
+  background: color-mix(in srgb, var(--c) 70%, #fff);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55), 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent);
+}
+.ov-marker.on .ov-pin::after { display: none; }
+.ov-marker.on:hover .ov-pin, .ov-marker.on.hover .ov-pin, .ov-marker.on.selected .ov-pin { transform: scale(1.3); }
+.ov-marker.dark { --c: var(--amber); }
+.ov-marker.cold { --c: var(--cold); }
+.ov-marker.protected { --c: var(--shield, #5aa9e6); }
+.ov-marker.protected .ov-pin { width: 24px; height: 24px; }
+.ov-marker.broken { --c: #a9b6c8; }
+.ov-marker.cold .ov-pin::before {
+  content: ''; position: absolute; inset: -2px; border-radius: 50%;
+  border: 2px solid var(--c); animation: ov-ping 1.8s ease-out infinite;
+}
+@keyframes ov-ping { from { transform: scale(1); opacity: 0.8; } to { transform: scale(2.1); opacity: 0; } }
+.ov-marker.dark .ov-pin, .ov-marker.cold .ov-pin { animation: ov-bob 2.8s ease-in-out infinite; }
+@keyframes ov-bob { 0%, 100% { translate: 0 0; } 50% { translate: 0 -3px; } }
+
+/* countdown ring for timed cuts */
+.ov-timer {
+  position: absolute; inset: -6px; border-radius: 50%;
+  background: conic-gradient(var(--c) calc(var(--p) * 360deg), rgba(255, 255, 255, 0.1) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 3px));
+}
+
+/* name tag */
+.ov-tag {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 9px 4px 10px; border-radius: 999px;
+  background: rgba(13, 20, 33, 0.9);
+  border: 1px solid color-mix(in srgb, var(--c) 45%, transparent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font: 600 11.5px/1.1 var(--sans); color: #eef3f9; white-space: nowrap;
+}
+.ov-tag b { font: 600 11px/1 var(--mono); color: var(--c); }
+.ov-tag .ov-time { font: 500 10.5px/1 var(--mono); color: var(--muted, #93a3b8); }
+.ov-tag .ov-id { font: 500 10.5px/1 var(--mono); color: var(--muted, #93a3b8); }
+.ov-marker.cold .ov-tag { background: var(--cold); border-color: var(--cold); color: #1c0c04; }
+.ov-marker.cold .ov-tag b, .ov-marker.cold .ov-tag .ov-time { color: #1c0c04; }
+.ov-day .ov-tag { background: rgba(255, 255, 255, 0.95); color: #142032; border-color: rgba(20, 32, 50, 0.12); }
+
+/* ---------- co-pilot ---------- */
+.ov-copilot {
+  position: relative; display: grid; gap: 3px;
+  width: max-content; max-width: 250px; padding: 9px 12px 10px;
+  border-radius: 14px; background: rgba(13, 20, 33, 0.94);
+  border: 1px solid color-mix(in srgb, var(--ice) 70%, transparent);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.4), 0 0 18px color-mix(in srgb, var(--ice) 18%, transparent);
+  font-size: 12.5px; line-height: 1.4; color: #e6eef7;
+}
+.ov-copilot::after {
+  content: ''; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px;
+  translate: -50% 0; rotate: 45deg; background: rgba(13, 20, 33, 0.94);
+  border-right: 1px solid color-mix(in srgb, var(--ice) 70%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--ice) 70%, transparent);
+}
+.ov-copilot .leader { position: absolute; left: 50%; top: calc(100% + 5px); width: 2px; height: 56px; translate: -50% 0; border-radius: 2px; background: linear-gradient(color-mix(in srgb, var(--ice) 80%, transparent), transparent); }
+.ov-copilot .who { display: inline-flex; align-items: center; gap: 5px; font: 600 10.5px/1 var(--sans); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ice); }
+.ov-copilot.ready { max-width: 280px; font-size: 13px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ov > div { transition: none; }
+  .ov-marker .ov-pin, .ov-marker .ov-pin::before { animation: none !important; }
+}
+
+/* ---------- loading the county ---------- */
+.county-loading {
+  position: absolute; inset: 0; z-index: 4; display: grid; place-items: center;
+  background: radial-gradient(ellipse at 50% 40%, #1a2840 0%, #0c1424 60%, #070b14 100%);
+}
+.cl-card { width: min(480px, calc(100vw - 32px)); display: grid; gap: 8px; text-align: center; }
+.cl-brand { font: 600 11px/1 var(--mono); letter-spacing: 0.22em; color: var(--ice); }
+.cl-card h1 { margin: 4px 0 0; font: 700 28px/1.15 var(--sans); letter-spacing: -0.01em; color: #eef3f9; }
+.cl-step { margin: 0; min-height: 20px; color: #b9c6d6; font-size: 14px; }
+.cl-bar { height: 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.08); overflow: hidden; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4); }
+.cl-bar i { display: block; height: 100%; border-radius: 6px; background: linear-gradient(90deg, #5aa9e6, var(--ice)); transition: width 260ms ease; box-shadow: 0 0 12px rgba(124, 196, 250, 0.6); }
+.cl-facts { margin: 4px 0 0; font: 500 11.5px/1 var(--mono); color: var(--muted, #93a3b8); letter-spacing: 0.04em; }
+html.county-building .hud, html.county-building .connecting { opacity: 0; pointer-events: none; }
+.hud { transition: opacity 400ms ease; }
+
+/* ---------- hover card that follows the pointer ---------- */
+.ov .ov-tip-anchor { position: fixed; left: 0; top: 0; z-index: 3; pointer-events: none; transition: none; }
+.ov-tip {
+  --c: var(--ice);
+  min-width: 190px; max-width: 260px; padding: 9px 11px 10px; display: grid; gap: 4px;
+  border-radius: 12px; background: rgba(13, 20, 33, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.1); border-left: 3px solid var(--c);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+  font-size: 12px; line-height: 1.3; color: #e6eef7;
+  animation: ov-tip-in 120ms ease-out both;
+}
+@keyframes ov-tip-in { from { opacity: 0; translate: 0 4px; } to { opacity: 1; translate: 0 0; } }
+.ov-tip.dark { --c: var(--amber); }
+.ov-tip.cold { --c: var(--cold); }
+.ov-tip.protected { --c: var(--shield, #5aa9e6); }
+.ov-tip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.ov-tip-head b { font-size: 13.5px; font-weight: 700; }
+.ov-tip-head span { font: 500 10.5px/1 var(--mono); color: var(--muted, #93a3b8); }
+.ov-tip-row { display: flex; justify-content: space-between; gap: 10px; }
+.ov-tip-row .num { font-family: var(--mono); font-size: 11.5px; }
+.ov-tip.cold .ov-tip-row .num { color: var(--cold); }
+.ov-tip-row.muted { color: var(--muted, #93a3b8); font-size: 11.5px; }
+.ov-tip-action { margin-top: 3px; padding-top: 6px; border-top: 1px solid rgba(255, 255, 255, 0.08); color: var(--c); font-weight: 600; font-size: 11.5px; }
+
+/* data credit (OpenStreetMap's license asks for it on the map) */
+.map-credit {
+  position: absolute; right: 10px; bottom: 6px; z-index: 2; margin: 0; pointer-events: none;
+  font: 500 10px/1 var(--sans); letter-spacing: 0.02em; color: rgba(214, 224, 236, 0.55);
+  text-shadow: 0 1px 2px rgba(6, 11, 22, 0.8);
+}
+html.county-building .map-credit { opacity: 0; }

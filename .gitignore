@@ -12,3 +12,9 @@ ai/models/hf/
 data/raw/
 data/*.zip
 data/large/
+# web: raw map downloads (rebuilt by web/tools, see web/README.md) and the team spec stay out of the repo
+data/art/
+data/geo/
+data/osm/
+data/msbuildings/
+CONTROL_ROOM_URI_Project_Spec.docx
