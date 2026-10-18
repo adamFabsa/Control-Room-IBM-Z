@@ -1,0 +1,40 @@
+flowchart LR
+  subgraph S1["1 · Public data"]
+    D1["EIA-930 ERCOT demand"]
+    D2["Open-Meteo temperatures"]
+    D3["EAGLE-I outages"]
+    D4["Census tracts · CDC SVI"]
+    D5["Texas DSHS deaths"]
+  end
+  subgraph S2["2 · Train on LinuxONE"]
+    T1["M1: XGBoost<br/>47,232 hours of demand"]
+    T2["M2: IBM Snap ML<br/>60,286 rollouts from 1,500 engine games"]
+    T3["IBM Granite 3.3 2B<br/>converted to big-endian GGUF"]
+  end
+  subgraph S3["3 · Serve in the game"]
+    R1["M1: demand every game hour"]
+    R2["M2 on Telum: every decision card"]
+    R3["Granite: alerts and debrief,<br/>number-checked"]
+    R4["Engine replays across all cores"]
+  end
+  subgraph S4["4 · On screen"]
+    O1["AI pick and effect<br/>of each option"]
+    O2["Estimated deaths vs 22"]
+    O3["Turning points ·<br/>1,000-storm plan test"]
+  end
+  D1 --> T1
+  D2 --> T1
+  D3 --> T2
+  D4 --> T2
+  T1 --> R1
+  T2 --> R2
+  T3 --> R3
+  R1 --> O1
+  R2 --> O1
+  R3 --> O1
+  R4 --> O3
+  D5 --> O2
+  R4 --> O2
+
+  classDef ibm fill:#0f62fe,stroke:#0043ce,color:#ffffff
+  class R2 ibm

@@ -1,0 +1,41 @@
+flowchart LR
+  subgraph Players["Players"]
+    B["Browser<br/>React + three.js 3D county"]
+    BOX["Grid Status Box<br/>Raspberry Pi Pico 2 · MicroPython"]
+    BR["USB bridge<br/>Python on the laptop"]
+  end
+  DATA[("Public data<br/>EIA-930 · Open-Meteo · EAGLE-I<br/>Census · CDC SVI · Texas DSHS")]
+
+  subgraph LX["IBM LinuxONE · IBM z17 (s390x) · Podman containers"]
+    subgraph SRV["server container"]
+      API["FastAPI + WebSocket<br/>storm clock"]
+      ENG["Game engine<br/>(stormgame)"]
+      M1["M1 demand forecast<br/>XGBoost"]
+      M2["M2 what-if advisor<br/>IBM Snap ML"]
+      AN["Turning points +<br/>1,000-storm stress test"]
+    end
+    LLM["llm container<br/>llama.cpp + IBM Granite 3.3 2B<br/>(big-endian)"]
+    DB[("db container<br/>PostgreSQL 16 + pgcrypto<br/>1,000,000 synthetic records")]
+    AI["ai container<br/>training jobs"]
+    VOL[("LUKS2 AES-XTS volume")]
+    TEL{{"Telum II<br/>on-chip AI accelerator"}}
+    CPA{{"CPACF<br/>crypto unit"}}
+  end
+
+  B <-->|"WebSocket: state out, actions in"| API
+  BOX <-->|"USB serial"| BR
+  BR <-->|"WebSocket"| API
+  API --> ENG
+  ENG --> M1
+  ENG --> M2
+  ENG --> AN
+  M2 -->|"zDNN (zdnn_tensors)"| TEL
+  API -->|"alert text, debrief"| LLM
+  API -->|"encrypted record counts"| DB
+  DB --- VOL
+  VOL -->|"AES-XTS"| CPA
+  DATA --> AI
+  AI -->|"trained models"| SRV
+
+  classDef ibm fill:#0f62fe,stroke:#0043ce,color:#ffffff
+  class TEL,CPA ibm
