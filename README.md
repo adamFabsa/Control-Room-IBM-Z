@@ -10,6 +10,22 @@ IBM Z Datathon 2026 · Track: Real-time AI for critical decisions · Play it: ht
 2. **The storm** (Sun 18:00 to Fri 12:00, real Dallas temperatures, the cut order rebuilt from real EAGLE-I outage data). You meet the grid operator's cut order by cutting and restoring neighborhoods yourself, while homes cool by the hour. The AI advises and never plays for you: an AI pick on every decision card (M2), a co-pilot tip on the map, and Granite's alert text. The game stops for the decisions that matter (a cut that would darken a hospital, water plant or gas station, ice and fuel emergencies, the order rising, falling behind it, homes getting cold); repeats in quick succession arrive as notices with a sound. If the cut falls more than 20% short of the order, the clock stops until you cut enough, so the grid never collapses before you can react. About 1.5 minutes and around 10 decisions at the starting speed (a game day takes 12 seconds); speeds 4 and 5 make it shorter.
 3. **How you did.** Estimated deaths in Dallas County next to the 22 the state confirmed in 2021; hours in cold homes for you, the 2021 playbook and the AI playing alone; your 3 turning points; the AI analyst's debrief; a data explorer (7 measures, together or separate, hover readout, CSV); and your winter plan tested on 1,000 generated storms.
 
+## Architecture and solution flow
+
+All three diagrams on one page: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+
+**System architecture on IBM LinuxONE**
+
+![System architecture on IBM LinuxONE](docs/diagrams/architecture.png)
+
+**Solution flow: one game, start to finish**
+
+![Solution flow](docs/diagrams/solution-flow.png)
+
+**From public data to real-time AI**
+
+![From public data to real-time AI](docs/diagrams/data-ai-pipeline.png)
+
 ## How this meets the judging criteria
 
 | Criterion | What we built | Evidence |
