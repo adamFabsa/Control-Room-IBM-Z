@@ -56,10 +56,20 @@ class Records:
         self.pending.add(circuit_id)
         try:
             self.counts[circuit_id] = await asyncio.to_thread(self._count, circuit_id)
+            self.failures = 0
             return True
-        except Exception:
-            log.exception("customer count failed; turning customer totals off")
-            self.enabled = False
+        except Exception as e:
+            # The database restarts on every deploy: drop the connection and reconnect on the next count;
+            # give up only if it keeps failing.
+            self.failures = getattr(self, "failures", 0) + 1
+            with self._lock:
+                if self._conn is not None:
+                    self._conn.close()
+                self._conn = None
+            log.warning("customer count failed (%s), attempt %d", e, self.failures)
+            if self.failures >= 5:
+                log.error("customer counts keep failing; turning customer totals off")
+                self.enabled = False
             return False
         finally:
             self.pending.discard(circuit_id)
