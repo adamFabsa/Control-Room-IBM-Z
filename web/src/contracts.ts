@@ -34,6 +34,8 @@ export interface EventOption {
   id: string;
   label: string;
   ai_pick: boolean;
+  /** M2 (Snap ML on LinuxONE): what this option does over the next 6 game hours */
+  m2?: { cold_person_hours_change: number; critical_dark_chance: number; grid_collapse_risk?: boolean } | null;
 }
 
 export interface GameEvent {
@@ -42,6 +44,9 @@ export interface GameEvent {
   text: string;
   options: EventOption[];
   target?: string;
+  kind?: string;
+  /** Granite's rewrite of the card, once it passes the server's number check */
+  ai_text?: string;
 }
 
 export type NoticeKind = 'cold' | 'order' | 'ice' | 'repair' | 'restore' | 'water' | 'gas' | 'info';
@@ -111,9 +116,15 @@ export interface Report {
   beat_playbook?: boolean;
   scores: { playbook_2021: ScoreSet; ai_alone: ScoreSet; player: ScoreSet };
   cold_people_by_hour?: { t: string[]; playbook_2021: number[]; ai_alone: number[]; player: number[] };
-  turning_points?: { time: string; action: Action; delta_cold_person_hours: number }[];
+  turning_points?: {
+    time: string | null; action: Action; delta_cold_person_hours: number;
+    label?: string; cold_person_hours_change?: number; grid_collapsed_without?: boolean; grid_collapsed?: boolean;
+  }[];
+  turning_points_run?: { replays: number; seconds: number; cores: number } | null;
   summary?: string;
+  summary_source?: 'pending' | 'template' | 'granite';
   plan?: string[];
-  stress_test?: { storms: number; works: number; worst: string };
+  stress_test?: { storms: number; works: number; worst: string; seconds?: number; cores?: number; collapses?: number };
+  stress_test_progress?: { status?: string; done?: number; storms?: number };
   game_check?: string;
 }

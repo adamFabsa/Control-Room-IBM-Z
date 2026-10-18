@@ -176,9 +176,14 @@ class M2:
         cph, dark, cost = self.score(state, [afters[i] for i in valid])
         best = valid[int(np.argmin(cost))]
         return {"option": state["event"]["options"][best]["id"],
-                "predictions": {state["event"]["options"][i]["id"]: {"cold_person_hours_change": round(float(cph[k])),
-                                                                      "critical_dark_chance": round(float(dark[k]), 2)}
-                                for k, i in enumerate(valid)}}
+                "predictions": {state["event"]["options"][i]["id"]: self._words(cph[k], dark[k]) for k, i in enumerate(valid)}}
+
+    @staticmethod
+    def _words(cph, dark):
+        """M2 learned a collapse as COLLAPSE_COST extra cold-hours; report that as a risk, not as cold-hours."""
+        risk = float(cph) >= COLLAPSE_COST / 2
+        return {"cold_person_hours_change": round(float(cph) - (COLLAPSE_COST if risk else 0)),
+                "critical_dark_chance": round(float(dark), 2), "grid_collapse_risk": risk}
 
     def player(self):
         """decide(state) -> actions: meet the cut order choosing circuits by M2, and rotate hourly when it helps."""

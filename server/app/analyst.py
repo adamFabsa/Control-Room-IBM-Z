@@ -68,7 +68,7 @@ def _chat(system, user, max_tokens):
     return text.strip().strip('"').strip(), reply.get("timings", {}).get("predicted_n", 0)
 
 
-async def write(system, facts, max_tokens=120, tries=2, required=(), still_wanted=None):
+async def write(system, facts, max_tokens=120, tries=2, required=(), still_wanted=None, forbidden=()):
     """Granite text that passes the number check and contains every `required` phrase, or None.
 
     still_wanted() is checked once the model is free, so stale requests (a closed event card) are dropped.
@@ -92,6 +92,7 @@ async def write(system, facts, max_tokens=120, tries=2, required=(), still_wante
             stats["tokens"] += tokens
         bad = invented_numbers(text, facts)
         missing = [p for p in required if p.lower() not in text.lower()]
+        missing += [f"not '{w}'" for w in forbidden if re.search(rf"\b{w}\b", text, re.I)]
         if missing:
             stats["rejected"] += 1
             log.info("rejected analyst text missing %s", missing)
@@ -131,6 +132,18 @@ def _effect(tp):
         return "led to the grid collapse"
     change = tp["cold_person_hours_change"]
     return f"{'saved' if change > 0 else 'cost'} {abs(change):,} cold person-hours"
+
+
+REPEAT_WORDS = ("repeat", "again", "continue", "keep doing", "do the same")
+AVOID_WORDS = ("avoid", "don't", "do not", "never", "reconsider", "instead")
+
+
+def tip_forbidden(turning_points):
+    """Advice words that would contradict the turning point (a 2B model sometimes praises a costly move)."""
+    tp = turning_points[0]
+    helped = tp.get("grid_collapsed_without") and not tp.get("grid_collapsed") or (
+        tp["cold_person_hours_change"] > 0 and not (tp.get("grid_collapsed") and not tp.get("grid_collapsed_without")))
+    return AVOID_WORDS if helped else REPEAT_WORDS
 
 
 def tip_facts(turning_points):

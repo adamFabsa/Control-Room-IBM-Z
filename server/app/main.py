@@ -7,7 +7,7 @@ import platform
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import Body, FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -24,6 +24,7 @@ session = GameSession()
 @asynccontextmanager
 async def lifespan(app):
     logging.getLogger("controlroom").info("M2 backend: %s", m2.get().backend)
+    preload = asyncio.create_task(session.records.preload())
     clock = asyncio.create_task(session.run_clock())
     yield
     clock.cancel()
@@ -34,7 +35,8 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 
 
 def _reason(e):
-    return f"missing field {e}" if isinstance(e, KeyError) else str(e)
+    text = f"missing field {e}" if isinstance(e, KeyError) else str(e)
+    return text.encode("utf-8", "replace").decode("utf-8")[:300]  # safe to send back whatever the input was
 
 
 @app.get("/api/health")
@@ -81,7 +83,11 @@ def get_ai():
 
 
 @app.post("/api/action")
-async def post_action(action: dict = Body(...)):
+async def post_action(request: Request):
+    try:
+        action = json.loads(await request.body())
+    except Exception:
+        raise HTTPException(400, "the body must be one JSON action object")
     try:
         await session.handle(action)
     except Exception as e:

@@ -94,7 +94,9 @@ export function NeighborhoodCard() {
       <p className="hc-status">
         {c.on
           ? <>Powered. Homes are at <b>{Math.round(c.indoor_f)}°F</b> inside.</>
-          : <>Dark for <b>{dur(c.dark_min)}</b>. Homes are down to <b className={cold ? 'cold' : 'dark'}>{Math.round(c.indoor_f)}°F</b> inside.</>}
+          : c.dark_min === 0
+            ? <>Just cut. Homes are still at <b className="dark">{Math.round(c.indoor_f)}°F</b> inside and start cooling now.</>
+            : <>Dark for <b>{dur(c.dark_min)}</b>. Homes are down to <b className={cold ? 'cold' : 'dark'}>{Math.round(c.indoor_f)}°F</b> inside.</>}
       </p>
 
       <div className="needs">

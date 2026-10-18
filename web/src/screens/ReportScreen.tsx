@@ -1,7 +1,8 @@
 import { Bot, CalendarClock, ClipboardList, FlaskConical, Sparkles, Trophy, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Report } from '../contracts';
-import { fmt } from '../format';
+import { fmt, gameClock } from '../format';
+import { compact } from '../panels/hud';
 import { useStore } from '../store';
 
 function mockReport(player: number): Report {
@@ -26,26 +27,53 @@ function mockReport(player: number): Report {
   };
 }
 
+/** Round a chart's top up to 1, 2 or 5 times a power of ten. */
+function niceMax(v: number): number {
+  const p = 10 ** Math.floor(Math.log10(v));
+  return ([1, 2, 5, 10].find((m) => m * p >= v) ?? 10) * p;
+}
+
 function Chart({ r }: { r: Report }) {
   const s = r.cold_people_by_hour;
-  if (!s) return null;
-  const W = 640, H = 220, pad = 28;
-  const n = s.player.length;
-  const max = Math.max(...s.playbook_2021, ...s.ai_alone, ...s.player, 1);
-  const path = (ys: number[]) => ys.map((y, i) => `${i ? 'L' : 'M'}${(pad + (i / (n - 1)) * (W - pad * 2)).toFixed(1)},${(H - pad - (y / max) * (H - pad * 2)).toFixed(1)}`).join('');
-  // the storm starts Sun 18:00, so midnights fall at hours 6, 30, 54, 78, 102
-  const days: [string, number][] = [['Sun', 0], ['Mon', 6], ['Tue', 30], ['Wed', 54], ['Thu', 78], ['Fri', 102]];
+  if (!s || s.t.length < 2) return null;
+  const W = 640, H = 230, padL = 44, padR = 12, padT = 10, padB = 26;
+  const n = s.t.length; // every line starts at the storm's first hour; a collapsed game's line just ends early
+  const max = niceMax(Math.max(...s.playbook_2021, ...s.ai_alone, ...s.player, 1));
+  const x = (i: number) => padL + (i / (n - 1)) * (W - padL - padR);
+  const y = (v: number) => H - padB - (v / max) * (H - padT - padB);
+  const path = (ys: number[]) => ys.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join('');
+  // a day label at each midnight in the real timestamps (the mock report has plain hour numbers instead)
+  const real = !Number.isNaN(Date.parse(s.t[0]));
+  const midnights: [string, number][] = real
+    ? s.t.map((t, i) => [gameClock(t), i] as const).filter(([c]) => c.hour === 0).map(([c, i]) => [c.label.split(' ')[0], i])
+    : [['Mon', 6], ['Tue', 30], ['Wed', 54], ['Thu', 78], ['Fri', 102]];
+  // label the start too, unless the first midnight is close enough that the two would overlap
+  const first = real ? gameClock(s.t[0]).label.split(' ')[0] : 'Sun';
+  const days: [string, number][] = (midnights[0]?.[1] ?? n) >= n * 0.09 ? [[first, 0], ...midnights] : midnights;
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="People in cold homes by day">
-      <line x1={pad} x2={W - pad} y1={H - pad} y2={H - pad} className="axis" />
-      {days.map(([d, h]) => (
-        <text key={d} x={pad + (h / (n - 1)) * (W - pad * 2)} y={H - 8} className="tick">{d}</text>
+    <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label={`People in cold homes each hour; top of the scale ${fmt(max)}`}>
+      {[0, 0.5, 1].map((f) => (
+        <g key={f}>
+          <line x1={padL} x2={W - padR} y1={y(max * f)} y2={y(max * f)} className={f ? 'grid' : 'axis'} />
+          <text x={padL - 6} y={y(max * f) + 4} className="tick" textAnchor="end">{compact(max * f)}</text>
+        </g>
+      ))}
+      {days.map(([d, i]) => (
+        <text key={`${d}${i}`} x={x(i)} y={H - 8} className="tick" textAnchor={i === 0 ? 'start' : 'middle'}>{d}</text>
       ))}
       <path d={path(s.playbook_2021)} className="l-2021" />
       <path d={path(s.ai_alone)} className="l-ai" />
       <path d={path(s.player)} className="l-you" />
     </svg>
   );
+}
+
+/** "saved 92.1M cold person-hours", or what a collapse meant. */
+function tpEffect(tp: NonNullable<Report['turning_points']>[number]): string {
+  if (tp.grid_collapsed_without && !tp.grid_collapsed) return 'kept the grid from collapsing';
+  if (tp.grid_collapsed && !tp.grid_collapsed_without) return 'led to the grid collapse';
+  const c = tp.cold_person_hours_change ?? -tp.delta_cold_person_hours;
+  return `${c > 0 ? 'saved' : 'cost'} ${compact(Math.abs(c))} cold person-hours`;
 }
 
 export function ReportScreen() {
@@ -90,10 +118,24 @@ export function ReportScreen() {
               <span className="legend"><i className="k-2021" />2021 <i className="k-ai" />AI alone <i className="k-you" />You</span></div>
             <Chart r={report} />
             {report.game_check && <small className="muted">Game check: {report.game_check}</small>}
+            {!!report.turning_points?.length && (
+              <div className="turning">
+                <b>Your turning points</b>
+                <ol>
+                  {report.turning_points.map((tp, i) => (
+                    <li key={i}><span>{tp.label ?? tp.action.type}</span><small className={(tp.cold_person_hours_change ?? 0) > 0 || tp.grid_collapsed_without ? 'good' : 'bad'}>{tpEffect(tp)}</small></li>
+                  ))}
+                </ol>
+                {report.turning_points_run && (
+                  <small className="muted">Found by replaying your storm {fmt(report.turning_points_run.replays)} times, once without each decision, on {report.turning_points_run.cores} LinuxONE cores in {report.turning_points_run.seconds.toFixed(1)} s.</small>
+                )}
+              </div>
+            )}
+
           </div>
           <div className="panel analyst">
             <span className="analyst-head"><span className="tile-ico"><Sparkles size={16} strokeWidth={2.4} /></span>AI analyst</span>
-            <p>{report.summary}</p>
+            <p>{report.summary ?? 'Reading your storm…'}</p>
           </div>
         </div>
         <div className="panel plan-box">
@@ -102,9 +144,11 @@ export function ReportScreen() {
             <ol>{report.plan?.map((p) => <li key={p}>{p}</li>)}</ol>
           </div>
           {report.stress_test ? (
-            <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> Tested on {fmt(report.stress_test.storms)} new storms</span><b>Works in {fmt(report.stress_test.works)}</b><small>{report.stress_test.worst}</small></div>
+            <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> Tested on {fmt(report.stress_test.storms)} new storms</span><b>Works in {fmt(report.stress_test.works)}</b><small>{report.stress_test.worst}{report.stress_test.seconds ? ` · ran in ${Math.round(report.stress_test.seconds)} s on ${report.stress_test.cores} LinuxONE cores` : ''}</small></div>
           ) : (
-            <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> 1,000-storm stress test</span><b>Runs on LinuxONE</b><small>Results appear here from the server</small></div>
+            <div className="stress"><span><FlaskConical size={14} strokeWidth={2.4} /> 1,000-storm stress test</span>
+              <b>{report.stress_test_progress?.status === 'running' ? `Testing… ${fmt(report.stress_test_progress.done ?? 0)} of ${fmt(report.stress_test_progress.storms ?? 1000)}` : 'Runs on LinuxONE'}</b>
+              <small>Your plan on storms generated from real Dallas cold spells (2005–2026), against the 2021 playbook</small></div>
           )}
         </div>
         {linkKind === 'mock' && <p className="center muted small">Mock numbers for the screen. The real report comes from GET /api/report.</p>}

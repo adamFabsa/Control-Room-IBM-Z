@@ -10,7 +10,7 @@ from functools import lru_cache
 from . import analyst, jobs
 from .engine import Game
 from .m2 import effective_cph
-from .players import ai_player_name, play_out, player, run_official
+from .players import ai_player_name, play_out, player, run_official, timeline_points
 
 log = logging.getLogger("controlroom.report")
 
@@ -22,6 +22,13 @@ def _hourly(history):
     return history[STEPS_PER_HOUR - 1::STEPS_PER_HOUR]
 
 
+def hourly(game, history):
+    """People in cold homes each hour of the storm, from the storm's start: the engine's own timeline when it
+    keeps one (so every line on the chart is counted the same way), else the server's per-step history."""
+    timeline = getattr(game, "timeline", None)
+    return timeline_points(timeline) if timeline else _hourly(history)
+
+
 @lru_cache(maxsize=16)
 def baselines(storm, seed):
     """Scores and hourly cold-homes curves for the two built-in players; same for every player."""
@@ -31,9 +38,9 @@ def baselines(storm, seed):
         out["real_2021"] = {"score": official[0], "hourly": official[1]}
     else:
         game, history = play_out(Game(storm=storm, seed=seed), player("playbook_2021"))
-        out["real_2021"] = {"score": game.score(), "hourly": _hourly(history)}
+        out["real_2021"] = {"score": game.score(), "hourly": hourly(game, history)}
     game, history = play_out(Game(storm=storm, seed=seed), player(ai_player_name()))
-    out["ai_alone"] = {"score": game.score(), "hourly": _hourly(history)}
+    out["ai_alone"] = {"score": game.score(), "hourly": hourly(game, history)}
     return out
 
 
@@ -72,7 +79,8 @@ class ReportJob:
         # Facts come from the template; Granite adds one coaching sentence (a 2B model flipped comparisons
         # when asked to write the facts itself).
         if self.turning_points:
-            tip = await analyst.write(analyst.TIP_PROMPT, analyst.tip_facts(self.turning_points), 60)
+            tip = await analyst.write(analyst.TIP_PROMPT, analyst.tip_facts(self.turning_points), 60,
+                                      tries=3, forbidden=analyst.tip_forbidden(self.turning_points))
             if tip:
                 self.summary, self.summary_source = f"{self.summary} {tip}", "granite"
 
@@ -94,8 +102,8 @@ def _stress_for_screen(stress):
 
 
 def build_report(snapshot, base, job):
-    you = _hourly(snapshot["history"])
-    axis = base["real_2021"]["hourly"]
+    you = snapshot["hourly"]
+    axis = max((base["real_2021"]["hourly"], base["ai_alone"]["hourly"], you), key=len)
     report = {
         "storm": snapshot["storm"],
         "seed": snapshot["seed"],

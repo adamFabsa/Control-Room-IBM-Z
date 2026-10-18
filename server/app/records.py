@@ -27,6 +27,7 @@ class Records:
         self.key = os.environ.get("PGCRYPTO_KEY")
         self.enabled = bool(self.url and self.key)
         self.counts = {}  # circuit id -> (accounts, medical)
+        self.medical = {}  # circuit id -> medical-device customers, counted once at startup for the screens
         self.pending = set()
         self.records_counted = 0
         self.seconds = 0.0
@@ -62,6 +63,23 @@ class Records:
             return False
         finally:
             self.pending.discard(circuit_id)
+
+    async def preload(self):
+        """Every circuit's medical-device customers, decrypted once (about 3 s) for the neighborhood cards."""
+        if not self.enabled:
+            return
+        def query():
+            with self._lock:
+                if self._conn is None or self._conn.closed:
+                    import psycopg
+                    self._conn = psycopg.connect(self.url, autocommit=True)
+                return self._conn.execute(
+                    "SELECT circuit_id, count(*) FILTER (WHERE decrypt_flag(medical_device, %s)) FROM customers GROUP BY 1",
+                    (self.key,)).fetchall()
+        try:
+            self.medical = {cid: n for cid, n in await asyncio.to_thread(query)}
+        except Exception:
+            log.exception("medical-device preload failed")
 
     def missing(self, circuits):
         """Cut circuits that have no count yet."""

@@ -7,7 +7,7 @@ other storms run the model on the storm's own hourly temperatures.
 import csv
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -27,9 +27,18 @@ class Forecast:
             self.booster.load_model(str(ROOT / "ai" / "models" / "m1_xgb.json"))
             with open(ROOT / "data" / "m1_uri2021_demand.csv") as f:
                 self.uri = {r["time_local"][:13]: float(r["dallas_county_demand_mw"]) for r in csv.DictReader(f)}
+            with open(ROOT / "data" / "openmeteo_texas_hourly.csv") as f:  # Feb 2021, for the Get ready clock
+                self.dallas_f = {r["time_utc"][:13]: float(r["dallas_f"]) for r in csv.DictReader(f)
+                                 if r["time_utc"].startswith("2021-02")}
             self.available = True
         except Exception as e:
             log.info("M1 not loaded (%s); demand stays the engine's formula", e)
+
+    def outside_f(self, iso_time):
+        """Measured Dallas temperature at a February 2021 hour, or None."""
+        utc = datetime.fromisoformat(iso_time).astimezone(timezone.utc).strftime("%Y-%m-%dT%H")
+        value = getattr(self, "dallas_f", {}).get(utc)
+        return None if value is None else round(value)
 
     def dallas_mw(self, state, temps):
         """M1's Dallas County demand for the state's hour; temps are the game's hourly outside °F so far."""

@@ -6,7 +6,8 @@ from . import analyst, m2
 from .engine import Game
 from .forecast import Forecast
 from .records import Records
-from .report import ReportJob
+from .report import ReportJob, hourly
+from .screens import Notices, decorate
 
 log = logging.getLogger("controlroom")
 
@@ -19,6 +20,7 @@ class GameSession:
     def __init__(self):
         self.clients = set()
         self.records = Records()
+        self.notices = Notices()
         self.forecast = Forecast()
         self._tasks = set()
         self.new_game()
@@ -31,6 +33,7 @@ class GameSession:
         self.event_pick = {}  # event id -> M2's pick and predictions
         self.temps = []  # hourly outside °F during the storm, for M1
         self.timed_cuts = {}  # circuit id -> engine step when the server restores it (cut with "minutes")
+        self.notices.clear()
         self._demand = (None, None)  # (hour, M1 demand) cache
         self.storm, self.seed = storm, seed
         self.game = Game(storm=storm, seed=seed)
@@ -46,6 +49,10 @@ class GameSession:
         s["paused"] = self.paused or s.get("event") is not None
         s["speed"] = self.speed
         self.records.add_totals(s)
+        if s["phase"] == "prepare" and s.get("storm") == "uri2021" and self.forecast.available:
+            measured = self.forecast.outside_f(s["time"])  # the engine shows the storm's first hour during Get ready
+            if measured is not None:
+                s["outside_f"] = measured
         if s["phase"] == "storm" and self.forecast.available:
             hour = s["time"][:13]
             if self._demand[0] != hour:  # M1 runs once per game hour
@@ -68,14 +75,33 @@ class GameSession:
                 for option in event["options"]:
                     option["ai_pick"] = option["id"] == pick["option"]
                     option["m2"] = pick["predictions"].get(option["id"])
+        decorate(s, self.game, self.log, self.records.medical)
+        self.notices.update(s)
+        s["notices"] = list(self.notices.items)
         if s["phase"] == "prepare":
             s["phase"] = "ready"  # the screens call Get ready "ready"
         return s
 
+    def _sell(self, action):
+        """Take back a Get-ready purchase: rebuild the game from the other purchases (same seed, same result)."""
+        if self.game.state()["phase"] != "prepare":
+            raise ValueError("items can only be taken back during Get ready")
+        same = lambda a: (a["type"] == "buy" and a.get("item") == action.get("item")
+                          and str(a.get("target", ""))[:4] == str(action.get("target", ""))[:4])
+        match = next((i for i in range(len(self.log) - 1, -1, -1) if same(self.log[i]["action"])), None)
+        if match is None:
+            raise ValueError(f"no {action.get('item')} to take back there")
+        keep = self.log[:match] + self.log[match + 1:]
+        self.game = Game(storm=self.storm, seed=self.seed)
+        self.log = []
+        for entry in keep:
+            self._engine_action(entry["action"])
+
     def snapshot(self):
         """A consistent copy of the finished (or current) game for the report."""
         return {"storm": self.storm, "seed": self.seed, "phase": self.game.state()["phase"],
-                "score": self.game.score(), "history": list(self.history), "log": list(self.log)}
+                "score": self.game.score(), "history": list(self.history), "log": list(self.log),
+                "hourly": hourly(self.game, self.history)}
 
     def finish(self):
         if self.game.state()["phase"] not in ("prepare", "storm"):
@@ -96,6 +122,8 @@ class GameSession:
             self.speed = value
         elif kind == "new_game":
             self.new_game(action.get("storm", "uri2021"), int(action.get("seed", 42)))
+        elif kind == "sell":
+            self._sell(action)
         else:
             step = self._engine_action(action)
             if kind == "start_storm":
@@ -125,6 +153,9 @@ class GameSession:
             del self.timed_cuts[circuit_id]
             try:
                 self._engine_action({"type": "restore", "circuit": circuit_id})
+                s = self.game.state()
+                area = next((c["area"] for c in s["circuits"] if c["id"] == circuit_id), circuit_id)
+                self.notices.restored(s, circuit_id, area)
             except Exception:
                 log.warning("timed restore of %s failed", circuit_id)
 
