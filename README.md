@@ -4,6 +4,8 @@ A winter-storm simulation game set in Dallas County. You get the county ready, d
 
 IBM Z Datathon 2026 · Track: Real-time AI for critical decisions · Play it: http://148.100.98.237:8000/
 
+**Demo video:** https://youtu.be/iWgThJWVLyY
+
 ## How it plays
 
 1. **Get ready** (time stopped, Fri 12 Feb 2021, 32°F). Spend 10 points on protections, generators, a warming center, gas, conservation, repair crews or smart switches. "Your preparations" lists everything placed and where.
