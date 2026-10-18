@@ -22,8 +22,9 @@ A bad action sent over the WebSocket gets `{"error": "..."}` back to that client
 ## Additions to the shared contract
 
 - **The server owns `paused` and `speed`.** `pause`, `play` and `speed` actions are handled by the server and never reach the engine. `paused` in the state is true when the player paused or an event card is open. `start_storm` starts the clock.
-- **`{"type": "new_game", "storm": "uri2021", "seed": 42}`** resets the game (server only).
-- Speeds: 1 = 20 s, 2 = 10 s, 3 = 5 s, 4 = 2 s, 5 = 0.5 s per game hour.
+- **`{"type": "new_game", "storm": "uri2021", "seed": 42, "quick": true}`** resets the game (server only; the report's Play again sends it).
+- **Pacing:** speeds 1 = 5 s, 2 = 2.5 s, 3 = 1 s, 4 = 0.5 s, 5 = 0.25 s per game hour; the storm starts at 4, so its 114 hours take about a minute.
+- **Quick play (the default; `"quick": false` turns it off):** the clock fast-forwards (0.1 s per game hour, `fast_forward: true` in the state) while there is no cut order and every neighborhood has power, and the AI co-pilot answers routine cards itself with M2's pick, logged like a player's choice and announced as a notice (`kind: "info"`). Only cards that put a critical building at risk stop the game: every one the player's own cut causes, and the first 2 ice, fuel or homes-getting-cold cards. The stress test then uses the greedy operator (about 45 s for 1,000 storms; M2 takes about 105 s), with the 2021 playbook's results computed at startup.
 - Phases: the server sends `ready` during Get ready (the engine calls it `prepare`), then `storm`, then `over`.
 - **Timed cuts:** `{"type": "cut", "circuit": "C-13", "minutes": 60}` cuts now and the server restores it when the time runs out; while it runs the circuit has `restore_in_min`.
 - **`demand_mw`** during the storm is M1's Dallas County forecast for that hour (`demand_source: "M1"`), replacing the engine's placeholder formula.

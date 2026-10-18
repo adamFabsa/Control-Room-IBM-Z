@@ -1,6 +1,7 @@
 """The one live game: storm clock, actions in, state out to every connected client."""
 import asyncio
 import logging
+import os
 
 from . import analyst, m2
 from .engine import Game
@@ -11,7 +12,16 @@ from .screens import Notices, decorate
 
 log = logging.getLogger("controlroom")
 
-SECONDS_PER_GAME_HOUR = {1: 20, 2: 10, 3: 5, 4: 2, 5: 0.5}
+# Pacing: the storm (114 game hours) plays in about a minute at the starting speed; 1-3 are for slower play.
+SECONDS_PER_GAME_HOUR = {1: 5, 2: 2.5, 3: 1, 4: 0.5, 5: 0.25}
+START_SPEED = 4
+# Quick play (the default): the clock fast-forwards while there is no cut order and every neighborhood has power,
+# and the AI co-pilot answers routine cards. Only cards that put a critical building at risk stop the game: every
+# one the player's own cut causes, and the first SHOW_ALERTS ice, fuel or homes-getting-cold cards.
+# {"type": "new_game", "quick": false} plays every card yourself, without fast-forward.
+QUICK_DEFAULT = os.environ.get("CONTROLROOM_QUICK", "1") == "1"
+QUIET_SECONDS_PER_GAME_HOUR = 0.1
+SHOW_ALERTS = 2
 STEPS_PER_GAME_HOUR = 12  # step() advances 5 game minutes
 TICK_S = 0.1  # at most 10 state messages a second
 
@@ -25,7 +35,9 @@ class GameSession:
         self._tasks = set()
         self.new_game()
 
-    def new_game(self, storm="uri2021", seed=42):
+    def new_game(self, storm="uri2021", seed=42, quick=None):
+        self.quick = QUICK_DEFAULT if quick is None else bool(quick)
+        self.alerts_shown = set()  # ids of the ice/fuel cards shown to the player in quick play
         if getattr(self, "job", None):
             self.job.cancel()
         self.job = ReportJob()
@@ -78,6 +90,8 @@ class GameSession:
         decorate(s, self.game, self.log, self.records.medical)
         self.notices.update(s)
         s["notices"] = list(self.notices.items)
+        s["quick"] = self.quick
+        s["fast_forward"] = self._quiet(s) and not self.paused
         if s["phase"] == "prepare":
             s["phase"] = "ready"  # the screens call Get ready "ready"
         return s
@@ -105,7 +119,7 @@ class GameSession:
 
     def finish(self):
         if self.game.state()["phase"] not in ("prepare", "storm"):
-            self.job.start(self.snapshot())
+            self.job.start(self.snapshot(), quick=self.quick)
 
     async def handle(self, action):
         if not isinstance(action, dict) or "type" not in action:
@@ -121,18 +135,59 @@ class GameSession:
                 raise ValueError("speed is 1 to 5")
             self.speed = value
         elif kind == "new_game":
-            self.new_game(action.get("storm", "uri2021"), int(action.get("seed", 42)))
+            quick = action.get("quick")
+            self.new_game(action.get("storm", "uri2021"), int(action.get("seed", 42)), None if quick is None else bool(quick))
         elif kind == "sell":
             self._sell(action)
         else:
             step = self._engine_action(action)
             if kind == "start_storm":
                 self.paused = False
+                self.speed = START_SPEED
+            self._auto_answer()
             if kind == "cut" and action.get("minutes"):  # a timed cut: the server restores it later
                 self.timed_cuts[action["circuit"]] = step + max(1, round(float(action["minutes"]) / 5))
             elif kind in ("cut", "restore"):
                 self.timed_cuts.pop(action["circuit"], None)
         await self.broadcast()
+
+    def _quiet(self, s):
+        """Nothing to decide: no cut order and every neighborhood has power, so quick play fast-forwards."""
+        return self.quick and s["phase"] == "storm" and s["order_mw"] == 0 and all(c["on"] for c in s["circuits"])
+
+    def _shows(self, event):
+        """In quick play, is this card one the player sees (the rest the AI co-pilot answers)?"""
+        if not self.quick:
+            return True
+        kind = event.get("kind")
+        if kind == "critical_cut":  # the player's own cut put a critical building at risk: their call
+            return True
+        if kind in ("ice", "fuel", "cold") and (event["id"] in self.alerts_shown or len(self.alerts_shown) < SHOW_ALERTS):
+            self.alerts_shown.add(event["id"])
+            return True
+        return False
+
+    def _auto_answer(self):
+        """Quick play: answer routine open cards with the AI pick, logged like a player's choice. True if any."""
+        answered = False
+        for _ in range(20):  # a cut can queue several cards
+            s = self.state()
+            event = s.get("event")
+            if not event or self._shows(event):
+                break
+            options = event["options"]
+            pick = next((o for o in options if o["ai_pick"]), options[0])
+            for option in [pick] + [o for o in options if o is not pick]:
+                try:
+                    self._engine_action({"type": "choose", "event": event["id"], "option": option["id"]})
+                    self.notices.ai(s, event["title"], option["label"])
+                    answered = True
+                    break
+                except Exception:
+                    continue
+            else:
+                break
+        return answered
 
     def _engine_action(self, action):
         """Apply an action to the engine and log it for replays; returns the engine step it happened at."""
@@ -188,7 +243,8 @@ class GameSession:
             if s["phase"] != "storm" or self.paused or s.get("event"):
                 owed = 0.0
                 continue
-            owed += elapsed * STEPS_PER_GAME_HOUR / SECONDS_PER_GAME_HOUR[self.speed]
+            seconds = QUIET_SECONDS_PER_GAME_HOUR if self._quiet(s) else SECONDS_PER_GAME_HOUR[self.speed]
+            owed += elapsed * STEPS_PER_GAME_HOUR / seconds
             stepped = False
             try:
                 while owed >= 1:
@@ -199,6 +255,8 @@ class GameSession:
                     s = self.game.state()
                     self.history.append({"time": s["time"], "people_cold": s["totals"]["people_cold"]})
                     self._restore_due(s.get("step", self.steps))
+                    if s.get("event") and self._auto_answer():
+                        s = self.game.state()
                     if s["phase"] != "storm" or s.get("event"):
                         owed = 0.0
                         self.finish()

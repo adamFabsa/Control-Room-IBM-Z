@@ -34,7 +34,8 @@ export function TimeWidget({ compact = false }: { compact?: boolean }) {
   const phase = skyPhase(hour);
   const face = SKY[phase];
   const t12 = clock ? clock12(clock.time) : null;
-  const status = eventOpen ? 'decide' : paused ? 'paused' : 'live';
+  const fast = useStore((s) => !!s.state?.fast_forward);
+  const status = eventOpen ? 'decide' : paused ? 'paused' : fast ? 'fast' : 'live';
   const link = linkKind === 'mock' ? 'MOCK' : connected ? 'LINUXONE' : 'OFFLINE';
 
   return (
@@ -117,7 +118,7 @@ export function TimeWidget({ compact = false }: { compact?: boolean }) {
           </div>
           <span className={`tw-status ${status}`} role="status">
             <span className="dot" />
-            {status === 'decide' ? 'DECIDE' : status === 'paused' ? 'PAUSED' : 'LIVE'}
+            {status === 'decide' ? 'DECIDE' : status === 'paused' ? 'PAUSED' : status === 'fast' ? 'FAST-FORWARD' : 'LIVE'}
           </span>
         </div>
       )}

@@ -133,6 +133,18 @@ def run_storm(seed, plan, operator, with_baseline):
     return seed, effective_cph(score), baseline, bool(score.get("grid_collapsed")), score["cold_person_hours"]
 
 
+def baseline_storm(seed):
+    official = run_official("playbook_2021", "generated", seed)
+    played = official[0] if official else play_out(Game(storm="generated", seed=seed), PLAYERS["playbook_2021"])[0].score()
+    return seed, (effective_cph(played), played["cold_person_hours"])
+
+
+async def baselines_for(seeds, baselines):
+    loop = asyncio.get_running_loop()
+    for seed, value in await asyncio.gather(*(loop.run_in_executor(pool(), baseline_storm, s) for s in seeds if s not in baselines)):
+        baselines[seed] = value
+
+
 async def stress_test(plan, operator, status, baselines):
     """Fills `status` as storms finish; `baselines` caches playbook_2021 scores by seed across tests."""
     loop = asyncio.get_running_loop()

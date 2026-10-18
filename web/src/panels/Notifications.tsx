@@ -1,4 +1,4 @@
-import { Bell, Droplets, Flame, Info, Plug, Snowflake, TrendingUp, Wrench, X, type LucideIcon } from 'lucide-react';
+import { Bell, Droplets, Flame, Plug, Snowflake, Sparkles, TrendingUp, Wrench, X, type LucideIcon } from 'lucide-react';
 import { useEffect } from 'react';
 import type { NoticeKind } from '../contracts';
 import { mapControls } from '../map/controls';
@@ -9,11 +9,11 @@ import { clock12 } from './hud';
 const at = (iso: string) => { const c = clock12(gameClock(iso).time); return `${c.hm} ${c.ampm}`; };
 
 const ICONS: Record<NoticeKind, LucideIcon> = {
-  cold: Snowflake, order: TrendingUp, ice: Snowflake, repair: Wrench, restore: Plug, water: Droplets, gas: Flame, info: Info,
+  cold: Snowflake, order: TrendingUp, ice: Snowflake, repair: Wrench, restore: Plug, water: Droplets, gas: Flame, info: Sparkles,
 };
 const TITLES: Record<NoticeKind, string> = {
   cold: 'Homes getting cold', order: 'New cut order', ice: 'Ice on the lines', repair: 'Line repaired',
-  restore: 'Power back on', water: 'Water', gas: 'Gas supply', info: 'Update',
+  restore: 'Power back on', water: 'Water', gas: 'Gas supply', info: 'AI co-pilot',
 };
 const LIFE_MS = 9000;
 const MAX_SHOWN = 3;

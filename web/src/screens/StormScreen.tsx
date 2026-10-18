@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { mapControls } from '../map/controls';
 import type { Rot } from '../map/iso';
 import { CameraWidget } from '../panels/CameraWidget';
@@ -76,9 +76,18 @@ export function StormScreen() {
   const target = useStore((s) => s.state?.event?.target);
   const hide = useStore((s) => s.ui.hidePanels);
 
-  // ease the camera to whatever the decision is about
+  // ease the camera to whatever the decision is about, then back out to the whole county once it's answered
+  const hadCard = useRef(false);
   useEffect(() => {
-    if (eventId && target) mapControls.focus(target, 3.4);
+    if (eventId) {
+      hadCard.current = true;
+      if (target) mapControls.focus(target, 3.4);
+      return;
+    }
+    if (!hadCard.current) return;
+    hadCard.current = false;
+    const id = setTimeout(() => mapControls.refit(), 1500);
+    return () => clearTimeout(id);
   }, [eventId, target]);
 
   if (hide) return null;

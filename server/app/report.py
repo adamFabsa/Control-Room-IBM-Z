@@ -44,6 +44,15 @@ def baselines(storm, seed):
     return out
 
 
+async def prewarm_stress_baselines():
+    """The 2021 playbook on every stress-test storm, once at startup, so each report only runs the player's plan."""
+    try:
+        await jobs.baselines_for(range(1, jobs.STRESS_STORMS + 1), _stress_baselines)
+        log.info("stress-test baselines ready (%d storms)", len(_stress_baselines))
+    except Exception:
+        log.exception("stress-test baseline prewarm failed")
+
+
 class ReportJob:
     def __init__(self):
         self.task = None
@@ -53,7 +62,8 @@ class ReportJob:
         self.summary_source = "pending"
         self.stress = {"status": "not_started"}
 
-    def start(self, snapshot):
+    def start(self, snapshot, quick=False):
+        self.quick = quick
         if self.task is None:
             self.task = asyncio.create_task(self._run(snapshot))
 
@@ -69,7 +79,9 @@ class ReportJob:
                 snap["storm"], snap["seed"], snap["log"], snap["score"], snap["history"])
             self.summary, self.summary_source = analyst.template_summary(scores, self.turning_points), "template"
             plan = [e["action"] for e in snap["log"] if e["action"]["type"] == "buy"]
-            await asyncio.gather(self._coach(), jobs.stress_test(plan, ai_player_name(), self.stress, _stress_baselines))
+            # quick play: the engine-style greedy operator (about 35 s for 1,000 storms; M2 takes about 105 s)
+            operator = "greedy" if getattr(self, "quick", False) else ai_player_name()
+            await asyncio.gather(self._coach(), jobs.stress_test(plan, operator, self.stress, _stress_baselines))
         except asyncio.CancelledError:
             raise
         except Exception:

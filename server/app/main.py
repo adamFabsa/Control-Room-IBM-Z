@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import analyst, m2
 from .engine import ENGINE_NAME
-from .report import baselines, build_report
+from .report import baselines, build_report, prewarm_stress_baselines
 from .session import GameSession
 
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +25,7 @@ session = GameSession()
 async def lifespan(app):
     logging.getLogger("controlroom").info("M2 backend: %s", m2.get().backend)
     preload = asyncio.create_task(session.records.preload())
+    prewarm = asyncio.create_task(prewarm_stress_baselines())
     clock = asyncio.create_task(session.run_clock())
     yield
     clock.cancel()

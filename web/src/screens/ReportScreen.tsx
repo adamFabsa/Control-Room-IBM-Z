@@ -1,4 +1,4 @@
-import { Bot, CalendarClock, ClipboardList, FlaskConical, Sparkles, Trophy, UserRound } from 'lucide-react';
+import { Bot, CalendarClock, ClipboardList, FlaskConical, RotateCcw, Sparkles, Trophy, UserRound } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import type { Report } from '../contracts';
 import { fmt, gameClock } from '../format';
@@ -78,6 +78,7 @@ function tpEffect(tp: NonNullable<Report['turning_points']>[number]): string {
 
 export function ReportScreen() {
   const linkKind = useStore((s) => s.linkKind);
+  const send = useStore((s) => s.send);
   const cph = useStore((s) => s.state?.totals.cold_person_hours ?? 0);
   const [report, setReport] = useState<Report | null>(null);
 
@@ -106,6 +107,9 @@ export function ReportScreen() {
           <span className="report-eyebrow">Storm over · Winter Storm Uri · Dallas County</span>
           <h1>{report.beat_playbook ? 'You beat the 2021 playbook.' : 'The 2021 playbook did better this time.'}</h1>
           <p>Same storm, same power shortage. You chose who went dark.</p>
+          <button type="button" className="gbtn ice play-again" onClick={() => send({ type: 'new_game' })}>
+            <RotateCcw size={18} strokeWidth={2.6} /> Play again
+          </button>
         </div>
         <div className="tiles">
           <div className="panel tile y2021"><span className="tile-head"><span className="tile-ico"><CalendarClock size={18} strokeWidth={2.4} /></span>What happened in 2021</span><b>{M(sc.playbook_2021.cold_person_hours)}</b><small>hours people spent in cold homes</small></div>

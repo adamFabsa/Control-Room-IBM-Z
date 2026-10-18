@@ -66,8 +66,6 @@ class Notices:
             return
         for cid in sorted(now["ice"] - p["ice"]):
             self._add("ice", f"Ice brought down a line in {area[cid]}. {cid} is dark until crews fix it.", s, cid)
-        for cid in sorted(p["ice"] - now["ice"]):
-            self._add("repair", f"Crews fixed the iced line in {area.get(cid, cid)}.", s, cid)
         for cid in sorted(now["cold"] - p["cold"]):
             self._add("cold", f"Homes in {area[cid]} ({cid}) dropped below 50°F.", s, cid)
         if now["boil"] and not p["boil"]:
@@ -77,12 +75,18 @@ class Notices:
         if now["gas"] and not p["gas"]:
             self._add("gas", "The gas compressor lost power: every cut order is 15% bigger until it's back.", s, "gas-1")
 
+    def ai(self, s, title, choice):
+        target = _target(title)
+        self._add("info", f"AI co-pilot chose “{choice}” for: {title}", s, target or "ai")
+
     def restored(self, s, circuit_id, area):
         self._add("restore", f"{area} ({circuit_id}) is back on, as you scheduled.", s, circuit_id)
 
     def _add(self, kind, text, s, target):
-        self.items = (self.items + [{"id": f"{kind}-{target}-{s.get('step', 0)}", "kind": kind, "text": text,
-                                     "target": target, "time": s["time"]}])[-MAX_NOTICES:]
+        notice = {"id": f"{kind}-{target}-{s.get('step', 0)}-{len(text)}", "kind": kind, "text": text, "time": s["time"]}
+        if target and TARGET.fullmatch(target):  # the screens fly the camera to a notice's target
+            notice["target"] = target
+        self.items = (self.items + [notice])[-MAX_NOTICES:]
 
     def clear(self):
         self.items, self.prev = [], None

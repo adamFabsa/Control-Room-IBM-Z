@@ -2,6 +2,8 @@
 
 A winter-storm simulation game set in Dallas County. You get the county ready, decide which neighborhoods lose power when Winter Storm Uri hits, and AI running on IBM LinuxONE compares your choices with what really happened in February 2021.
 
+A game takes about two minutes: the 114-hour storm plays in about a minute, an AI co-pilot handles routine calls, and the game stops only for the decisions that put a hospital, water plant or gas station at risk. The report is ready two seconds after the storm.
+
 IBM Z Datathon 2026 · Track: Real-time AI for critical decisions
 
 ## Running on IBM LinuxONE

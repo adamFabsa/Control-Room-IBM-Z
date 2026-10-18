@@ -77,6 +77,9 @@ export interface GameState {
   prep?: { keep_gas?: boolean; conservation?: boolean; repair_crews?: boolean; warming_center?: boolean };
   notices?: Notice[];
   weather?: { snow?: number };
+  /** quick play: the clock is fast-forwarding (no cut order, every neighborhood has power) */
+  fast_forward?: boolean;
+  quick?: boolean;
 }
 
 export type BuyItem =
@@ -100,7 +103,8 @@ export type Action =
   | { type: 'choose'; event: string; option: string }
   | { type: 'pause' }
   | { type: 'play' }
-  | { type: 'speed'; value: number };
+  | { type: 'speed'; value: number }
+  | { type: 'new_game'; storm?: string; seed?: number; demo?: boolean };
 
 export interface ScoreSet {
   cold_person_hours: number;

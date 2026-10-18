@@ -28,6 +28,7 @@ EVENT_PROMPT = (
 )
 
 _lock = asyncio.Lock()  # llama-server runs one request at a time on 3 cores
+_cache = {}  # (prompt, input) -> accepted text
 stats = {"requests": 0, "accepted": 0, "rejected": 0, "failed": 0, "seconds": 0.0, "tokens": 0}
 
 
@@ -76,6 +77,8 @@ async def write(system, facts, max_tokens=120, tries=2, required=(), still_wante
     if not LLM_URL:
         return None
     user = facts if isinstance(facts, str) else json.dumps(facts)
+    if (system, user) in _cache:
+        return _cache[(system, user)]
     for _ in range(tries):
         async with _lock:
             if still_wanted and not still_wanted():
@@ -100,6 +103,7 @@ async def write(system, facts, max_tokens=120, tries=2, required=(), still_wante
         if not bad:
             stats["accepted"] += 1
             log.info("accepted analyst text (%d tokens, %.1fs)", tokens, time.perf_counter() - start)
+            _cache[(system, user)] = text
             return text
         stats["rejected"] += 1
         log.info("rejected analyst text with numbers not in its input: %s", sorted(bad))
