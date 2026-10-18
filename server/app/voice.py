@@ -9,7 +9,9 @@ import json
 import logging
 import os
 import re
+import time
 import urllib.request
+from collections import deque
 
 log = logging.getLogger("controlroom.voice")
 
@@ -18,6 +20,31 @@ VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
 MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_flash_v2_5")
 URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice}"
 _cache: dict[str, bytes] = {}
+# The site is public, so anyone can ask for lines. Lines already spoken come from the cache for free; new ones
+# spend ElevenLabs credits, so they are capped for everyone together: per minute, and characters per day.
+MAX_PER_MINUTE = int(os.environ.get("VOICE_MAX_PER_MINUTE", "20"))
+DAILY_CHARS = int(os.environ.get("VOICE_DAILY_CHARS", "10000"))
+_recent = deque()  # times of the last minute's new lines
+_today = {"date": None, "chars": 0}
+
+
+class Throttled(Exception):
+    """Over the voice guide's budget; the game goes on without it."""
+
+
+def _spend(text):
+    now = time.time()
+    while _recent and now - _recent[0] > 60:
+        _recent.popleft()
+    if len(_recent) >= MAX_PER_MINUTE:
+        raise Throttled("the voice guide is busy; it speaks again in a minute")
+    date = time.strftime("%Y-%m-%d")
+    if _today["date"] != date:
+        _today.update(date=date, chars=0)
+    if _today["chars"] + len(text) > DAILY_CHARS:
+        raise Throttled("the voice guide has used today's budget")
+    _recent.append(now)
+    _today["chars"] += len(text)
 
 LINES = ("intro", "storm", "order", "card", "short", "cold", "report")
 
@@ -70,11 +97,13 @@ def _synthesize(text):
 
 
 async def speak(text):
-    """MP3 bytes for the text (cached), or None if the voice is off or ElevenLabs fails."""
+    """MP3 bytes for the text (cached), or None if the voice is off or ElevenLabs fails. Raises Throttled when a
+    new line would go over the per-minute or daily budget."""
     if not enabled() or not text:
         return None
     key = hashlib.sha256(f"{VOICE_ID}|{MODEL}|{text}".encode()).hexdigest()
     if key not in _cache:
+        _spend(text)  # raises Throttled past the budget
         try:
             _cache[key] = await asyncio.to_thread(_synthesize, text)
         except Exception as e:

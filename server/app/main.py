@@ -134,7 +134,10 @@ async def voice_line(request: Request):
     text = voice.line_text(line, session.state(), report)
     if not text:
         raise HTTPException(409, "that line doesn't apply right now")
-    audio = await voice.speak(text)
+    try:
+        audio = await voice.speak(text)
+    except voice.Throttled as e:
+        raise HTTPException(429, str(e))
     if audio is None:
         raise HTTPException(502, "the voice service didn't answer")
     return Response(audio, media_type="audio/mpeg", headers={"x-voice-text": text.encode("ascii", "ignore").decode()[:300]})
