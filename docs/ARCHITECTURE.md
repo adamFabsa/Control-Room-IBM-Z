@@ -7,6 +7,11 @@ Three Mermaid diagrams. GitHub draws them below; to edit or export one, paste it
 Everything that thinks runs on one IBM LinuxONE VM (IBM z17, s390x) in Podman containers. M2 runs on the Telum II on-chip AI accelerator through IBM Snap ML and zDNN, with a CPU fallback; the database volume and the customer records are encrypted with the CPACF crypto unit.
 
 ```mermaid
+---
+config:
+  look: classic
+  theme: default
+---
 flowchart LR
   subgraph Players["Players"]
     B["Browser<br/>React + three.js 3D county"]
@@ -46,15 +51,20 @@ flowchart LR
   DATA --> AI
   AI -->|"trained models"| SRV
 
-  classDef ibm fill:#0f62fe,stroke:#0043ce,color:#ffffff
+  classDef ibm fill:#d0e2ff,stroke:#0f62fe,stroke-width:2px,color:#001141
   class TEL,CPA ibm
 ```
 
 ## Solution flow: one game, start to finish
 
-The AI advises at every critical moment; the player decides. If the cut falls more than 20% short of the order, the clock stops until the player cuts enough, so the grid never collapses before anyone can react.
+The AI advises at every critical moment; the player decides. If the cut falls more than 20 percent short of the order, the clock stops until the player cuts enough, so the grid never collapses before anyone can react.
 
 ```mermaid
+---
+config:
+  look: classic
+  theme: default
+---
 flowchart TD
   A(["Open the game"]) --> B["Get ready<br/>spend 10 points: generators, warming centers,<br/>gas kept flowing, repair crews, smart switches"]
   B --> C["Start the storm<br/>Sun 18:00 to Fri 12:00 on real Dallas temperatures"]
@@ -63,7 +73,7 @@ flowchart TD
   E -->|yes| F["Decision card, game paused<br/>M2 on Telum: AI pick and effect of each option<br/>IBM Granite: number-checked alert"]
   F --> G["Player decides<br/>click, or the red button on the box"]
   G --> D
-  E -->|no| H{"Cut more than 20%<br/>short of the order?"}
+  E -->|no| H{"Cut more than 20 percent<br/>short of the order?"}
   H -->|yes| I["Clock stops until<br/>the player cuts enough"]
   I --> D
   H -->|no| J["Player cuts and restores<br/>neighborhoods on the map"]
@@ -71,13 +81,18 @@ flowchart TD
   K -->|no| D
   K -->|yes| L["Report<br/>estimated deaths vs the 22 confirmed in 2021<br/>turning points from replays · plan on 1,000 storms<br/>IBM Granite debrief"]
 
-  classDef ai fill:#0f62fe,stroke:#0043ce,color:#ffffff
+  classDef ai fill:#d0e2ff,stroke:#0f62fe,stroke-width:2px,color:#001141
   class F,L ai
 ```
 
 ## From public data to real-time AI
 
 ```mermaid
+---
+config:
+  look: classic
+  theme: default
+---
 flowchart LR
   subgraph S1["1 · Public data"]
     D1["EIA-930 ERCOT demand"]
@@ -116,6 +131,6 @@ flowchart LR
   D5 --> O2
   R4 --> O2
 
-  classDef ibm fill:#0f62fe,stroke:#0043ce,color:#ffffff
+  classDef ibm fill:#d0e2ff,stroke:#0f62fe,stroke-width:2px,color:#001141
   class R2 ibm
 ```
