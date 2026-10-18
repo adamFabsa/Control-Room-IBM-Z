@@ -1,5 +1,7 @@
 # Evidence: CONTROL ROOM: URI on IBM LinuxONE
 
+For the video, `bash ~/control-room/scripts/linuxone_tour.sh` on the VM prints the machine, containers, the three AI models, the encryption and the live game on one screen (read-only, no secrets). The sections below are the same facts command by command.
+
 Captured from the team's IBM LinuxONE Community Cloud VM on Sun Oct 18 09:03:20 AM UTC 2026. Every block shows the command that produced it, so it can be re-run and screenshotted. The live game: http://148.100.98.237:8000/ · the same numbers, live: `curl http://148.100.98.237:8000/api/ai`.
 
 ## 1. The machine: IBM z17, on-chip AI accelerator (Telum II, `nnpa`), CPACF crypto (`msa`)
