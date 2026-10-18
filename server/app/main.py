@@ -7,11 +7,11 @@ import platform
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from . import analyst, m2
+from . import analyst, m2, voice
 from .engine import ENGINE_NAME
 from .report import baselines, build_report, prewarm_stress_baselines
 from .session import GameSession
@@ -108,6 +108,36 @@ async def get_report():
     snapshot = session.snapshot()
     base = await asyncio.to_thread(baselines, session.storm, session.seed)
     return build_report(snapshot, base, session.job, session.forecast)
+
+
+@app.get("/api/voice")
+def voice_status():
+    return {"enabled": voice.enabled(), "lines": list(voice.LINES)}
+
+
+@app.post("/api/voice")
+async def voice_line(request: Request):
+    """{"line": "intro" | "storm" | "order" | "card" | "short" | "cold" | "report"} -> MP3 of that line, written
+    by the server from the live game (never text from the browser)."""
+    try:
+        line = json.loads(await request.body())["line"]
+    except Exception:
+        raise HTTPException(400, "send {\"line\": ...}")
+    if line not in voice.LINES:
+        raise HTTPException(400, f"line is one of {', '.join(voice.LINES)}")
+    if not voice.enabled():
+        raise HTTPException(503, "the voice guide needs ELEVENLABS_API_KEY on the server")
+    report = None
+    if line == "report":
+        snapshot = session.snapshot()
+        report = build_report(snapshot, await asyncio.to_thread(baselines, session.storm, session.seed), session.job)
+    text = voice.line_text(line, session.state(), report)
+    if not text:
+        raise HTTPException(409, "that line doesn't apply right now")
+    audio = await voice.speak(text)
+    if audio is None:
+        raise HTTPException(502, "the voice service didn't answer")
+    return Response(audio, media_type="audio/mpeg", headers={"x-voice-text": text.encode("ascii", "ignore").decode()[:300]})
 
 
 @app.websocket("/ws")

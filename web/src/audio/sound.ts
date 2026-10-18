@@ -90,6 +90,13 @@ interface Engine {
 // which notice to ping for when several arrive together
 const NOTICE_RANK: Record<NoticeKind, number> = { cold: 3, ice: 3, restore: 2, repair: 2, order: 1, water: 1, gas: 1, info: 0 };
 const rank = (k: NoticeKind): number => NOTICE_RANK[k] ?? 0;
+/** Everything placed so far: protections, smart switches, generators, warming centers and the county-wide items. */
+function placedCount(s: GameState): number {
+  const p = s.prep ?? {};
+  return s.circuits.filter((c) => c.protected || c.parent).length + s.buildings.filter((b) => b.generator).length
+    + (s.warming_centers?.length ?? 0) + (p.keep_gas ? 1 : 0) + (p.conservation ? 1 : 0) + (p.repair_crews ? 1 : 0);
+}
+
 const pingKind = (k: NoticeKind): PingKind => (k === 'cold' || k === 'ice' ? 'cold' : k === 'restore' || k === 'repair' ? 'bright' : 'neutral');
 
 function moodFor(phase: Phase | null, snow: number): WindMood {
@@ -118,7 +125,7 @@ class SoundSystem {
   private pendingPing: NoticeKind | null = null;
   private readonly seen = new Set<string>();
   private amb: { phase: Phase | null; snow: number; at: number } = { phase: null, snow: -1, at: -Infinity };
-  private readonly last = { tick: -1e9, select: -1e9, cut: -1e9, restore: -1e9, bell: -1e9, ping: -1e9, order: -1e9 };
+  private readonly last = { tick: -1e9, select: -1e9, cut: -1e9, restore: -1e9, bell: -1e9, ping: -1e9, order: -1e9, place: -1e9, repair: -1e9 };
   /** the cut order the last alert sounded for; a new alert needs a real jump above it */
   private alertedOrder = 0;
 
@@ -295,6 +302,19 @@ class SoundSystem {
       this.last.order = now;
       this.alertedOrder = order;
       delay = 0.5;
+    }
+    // something placed (Get ready purchases, emergency buys): a thunk and a sparkle
+    if (placedCount(cur) > placedCount(prev) && now - this.last.place > 150) {
+      this.last.place = now;
+      s.place(s.at(delay));
+      delay = Math.max(delay, 0.3);
+    }
+    // an iced line repaired: a wrench and a chime
+    const fixedLines = prev.circuits.filter((c) => c.broken && !cur.circuits.find((x) => x.id === c.id)?.broken).length;
+    if (fixedLines && now - this.last.repair > 500) {
+      this.last.repair = now;
+      s.repair(s.at(delay));
+      delay = Math.max(delay, 0.5);
     }
     const { cuts, restores } = diffCircuits(cur.circuits, prev.circuits);
     if (cuts && now - this.last.cut > 200) {

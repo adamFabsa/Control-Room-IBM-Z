@@ -225,6 +225,22 @@ export class Synth {
 
   // ---------------------------------------------------------------- news
 
+  /** Something placed on the map: a soft wooden thunk under a two-note sparkle. */
+  place(t: number): void {
+    this.tone(t, { freq: 190, to: 95, glide: 0.09, peak: 0.22, attack: 0.003, decay: 0.16 });
+    this.noise(t, { type: 'lowpass', freq: 900, q: 0.8, peak: 0.12, attack: 0.002, decay: 0.06 });
+    this.chime(t + 0.06, 1046.5, 0.05, 0.5);
+    this.chime(t + 0.14, 1568, 0.045, 0.7);
+  }
+
+  /** A line repaired: two ratchet clicks of a wrench, then a rising chime. */
+  repair(t: number): void {
+    for (let i = 0; i < 3; i++) this.noise(t + i * 0.07, { type: 'bandpass', freq: 3200, q: 7, peak: 0.09, attack: 0.001, decay: 0.035 });
+    this.tone(t + 0.22, { type: 'triangle', freq: 220, peak: 0.08, attack: 0.002, decay: 0.12, lowpass: 1600 });
+    this.chime(t + 0.3, 659.25, 0.06, 0.8);
+    this.chime(t + 0.42, 987.77, 0.055, 1.1);
+  }
+
   /** The grid operator's order: a radio-dispatch two-tone (three notes when cuts begin), clearly over the wind. */
   order(t: number, first: boolean): void {
     const notes = first ? [880, 659.25, 880] : [880, 659.25];

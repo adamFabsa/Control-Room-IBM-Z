@@ -20,6 +20,7 @@ services:
       ENGINE: ${ENGINE:-auto}
       LLM_URL: http://llm:8080
       PGCRYPTO_KEY: ${PGCRYPTO_KEY}
+      ELEVENLABS_API_KEY: ${ELEVENLABS_API_KEY:-}
     ports:
       - "8000:8000"
     depends_on:

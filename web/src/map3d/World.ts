@@ -879,10 +879,13 @@ export class World implements MapScene {
     this.pickables.unshift(grp);
     this.tops.set(b.id, H + 0.02);
     const r = w * 0.8;
-    const mat = new THREE.MeshBasicMaterial({ color: ICE, transparent: true, opacity: 0, depthWrite: false });
+    // drawn over the ground and nearby buildings, so the ring (protected, at risk, generator target) stays visible
+    // when the detailed ground and houses load in at street zoom
+    const mat = new THREE.MeshBasicMaterial({ color: ICE, transparent: true, opacity: 0, depthWrite: false, depthTest: false });
     const ring = new THREE.Mesh(new THREE.RingGeometry(r, r + w * 0.08, 48), mat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.set(x, 0.012, z);
+    ring.renderOrder = 10;
     this.fx.add(ring);
     const gen = new THREE.Mesh(new THREE.BoxGeometry(w * 0.16, w * 0.11, w * 0.11), new THREE.MeshStandardMaterial({ color: GEN, emissive: 0x5a4300 }));
     gen.position.set(x + w * 0.62, w * 0.055, z);

@@ -66,7 +66,6 @@ export function ReadyScreen() {
         <div className="panel ready-head pop">
           <span className="rh-icon" aria-hidden="true"><Snowflake size={26} strokeWidth={2.2} /></span>
           <div className="rh-text">
-            <span className="rh-eyebrow">Winter Storm Uri · Feb 2021</span>
             <h1>The storm hits in 3 days</h1>
             <p>Spend your points to get the county ready.</p>
           </div>

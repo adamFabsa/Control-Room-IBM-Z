@@ -1,19 +1,40 @@
 // HTML layer over the canvas: status markers, map labels and the co-pilot pin.
 // React renders the content; positions are written straight to the DOM every frame, and lower-priority
 // labels hide when they would overlap a more important one, so the map never turns into a pile of tags.
-import { Bot, GraduationCap, House, Landmark, Moon, Shield, Thermometer, ZapOff, type LucideIcon } from 'lucide-react';
-import { useEffect, useRef } from 'react';
+import { Bot, CheckCircle2, GraduationCap, House, Landmark, Moon, Plus, PlugZap, Shield, Thermometer, Wrench, ZapOff, type LucideIcon } from 'lucide-react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Circuit } from '../contracts';
 import { dur, fmt, shortDur } from '../format';
+import { planEntries } from '../panels/PlanList';
 import { useStore } from '../store';
 import { anchorOf } from './controls';
-import { AREA_LABELS, BUILDING_BY_ID, CIRCUIT_BY_ID, CIRCUITS } from './layout';
+import { AREA_LABELS, BUILDING_BY_ID, BUILDINGS, CIRCUIT_BY_ID, CIRCUITS } from './layout';
 import './map.css';
 import type { MapScene } from './types';
 
 type Anchor = [gx: number, gy: number, height: number];
 /** Higher wins a collision. */
-const PRI = { copilot: 60, alert: 50, selected: 40, marker: 30, area: 20, campus: 15, place: 10, landmark: 8 } as const;
+const PRI = { copilot: 60, target: 58, badge: 55, alert: 50, selected: 40, marker: 30, area: 20, campus: 15, place: 10, landmark: 8 } as const;
+/** County-wide items (conservation, repair crews) float over Downtown, the county seat. */
+const COUNTY_ANCHOR = 'C-01';
+const BADGE_LIFT = 46, BADGE_STEP = 30;
+
+/** Lines whose ice damage was just repaired, for a few seconds of "Line fixed". */
+function useRecentlyFixed(circuits: Circuit[] | undefined): string[] {
+  const prev = useRef(new Set<string>());
+  const [fixed, setFixed] = useState<string[]>([]);
+  useEffect(() => {
+    if (!circuits) return;
+    const now = new Set(circuits.filter((c) => c.broken).map((c) => c.id));
+    const done = [...prev.current].filter((id) => !now.has(id));
+    prev.current = now;
+    if (!done.length) return;
+    setFixed((f) => [...f, ...done]);
+    const t = setTimeout(() => setFixed((f) => f.filter((id) => !done.includes(id))), 3500);
+    return () => clearTimeout(t);
+  }, [circuits]);
+  return fixed;
+}
 interface Item { el: HTMLElement; at: Anchor; pri: number; align: 'bottom' | 'center'; minZoom: number; lift: number; clamp?: boolean }
 
 type MarkerKind = 'on' | 'dark' | 'cold' | 'protected' | 'broken';
@@ -36,7 +57,12 @@ export function MapOverlay({ scene }: { scene: MapScene }) {
   const selected = useStore((s) => s.ui.selected);
   const hover = useStore((s) => s.ui.hover);
   const mapClick = useStore((s) => s.mapClick);
+  const state = useStore((s) => s.state);
+  const tool = useStore((s) => s.ui.tool);
+  const buyItem = useStore((s) => s.ui.buyItem);
+  const emergencyItem = useStore((s) => s.ui.emergencyItem);
   const hoverId = hover ? (hover.kind === 'circuit' ? hover.id : hover.circuit) : null;
+  const fixed = useRecentlyFixed(circuits);
 
   useEffect(() => {
     const p = { x: 0, y: 0 };
@@ -74,6 +100,17 @@ export function MapOverlay({ scene }: { scene: MapScene }) {
 
   const cpAt = copilot?.target ? anchorOf(copilot.target) : null;
   const day = phase === 'ready';
+  // where each placed item sits, stacked when several share a building or district
+  const stack = new Map<string, number>();
+  const badges = (state ? planEntries(state) : []).map((e) => {
+    const at = e.focus ?? COUNTY_ANCHOR;
+    const i = stack.get(at) ?? 0;
+    stack.set(at, i + 1);
+    return { e, at, i };
+  });
+  const placingGenerator = (phase === 'ready' && tool === 'buy' && buyItem === 'generator') || (tool === 'emergency' && emergencyItem === 'generator');
+  const genTargets = placingGenerator ? BUILDINGS.filter((b) => b.kind !== 'school' && !state?.buildings.find((x) => x.id === b.id)?.generator) : [];
+  const crews = !!state?.prep?.repair_crews;
 
   return (
     <div className={`overlay ov ${day ? 'ov-day' : 'ov-night'}`} ref={root}>
@@ -121,6 +158,39 @@ export function MapOverlay({ scene }: { scene: MapScene }) {
                 {kind !== 'on' && <Icon size={14} strokeWidth={2.5} />}
               </span>
             </button>
+          </div>
+        );
+      })}
+      {badges.map(({ e, at, i }) => {
+        const a = anchorOf(at);
+        if (!a) return null;
+        return (
+          <div key={`b-${e.key}`} className="ov-anchor" ref={bind(`b-${e.key}`, [a[0], a[1], scene.topOf(at) + 0.12], PRI.badge, 'bottom', 0, BADGE_LIFT + i * BADGE_STEP)}>
+            <div className={`ov-badge${day ? ' wide' : ''}`} style={{ '--c': e.color } as CSSProperties} title={`${e.name} · ${e.where}`}>
+              <span className="ov-badge-ico"><e.Icon size={day ? 15 : 13} strokeWidth={2.5} /></span>
+              {day && <span className="ov-badge-text">{e.name}</span>}
+            </div>
+          </div>
+        );
+      })}
+      {genTargets.map((b) => (
+        <div key={`t-${b.id}`} className="ov-anchor" ref={bind(`t-${b.id}`, [b.at[0], b.at[1], scene.topOf(b.id) + 0.12], PRI.target, 'bottom', 0, BADGE_LIFT + (stack.get(b.id) ?? 0) * BADGE_STEP)}>
+          <button type="button" className="ov-target" onClick={() => mapClick({ kind: 'building', id: b.id, circuit: b.circuit })}>
+            <Plus size={13} strokeWidth={3} /><PlugZap size={13} strokeWidth={2.5} /> {b.name}
+          </button>
+        </div>
+      ))}
+      {(circuits ?? []).filter((c) => c.broken || fixed.includes(c.id)).map((c) => {
+        const id = c.parent ?? c.id;
+        const a = anchorOf(id);
+        if (!a) return null;
+        const done = !c.broken;
+        return (
+          <div key={`r-${c.id}`} className="ov-anchor" ref={bind(`r-${c.id}`, [a[0], a[1], scene.topOf(id) + 0.12], PRI.badge, 'bottom', 0, BADGE_LIFT)}>
+            <div className={`ov-crew${done ? ' fixed' : ''}`}>
+              {done ? <CheckCircle2 size={14} strokeWidth={2.6} /> : <Wrench size={14} strokeWidth={2.6} className="ov-wrench" />}
+              {done ? 'Line fixed' : crews ? 'Crews fixing · 2 h' : 'Crews on the way · 6 h'}
+            </div>
           </div>
         );
       })}

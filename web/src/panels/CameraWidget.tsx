@@ -1,6 +1,7 @@
-import { LocateFixed, RotateCcw, RotateCw, Volume2, VolumeX, ZoomIn, ZoomOut } from 'lucide-react';
-import { useState } from 'react';
+import { LocateFixed, MessageCircleMore, MessageCircleOff, RotateCcw, RotateCw, Volume2, VolumeX, ZoomIn, ZoomOut } from 'lucide-react';
+import { useState, useSyncExternalStore } from 'react';
 import { toggleMuted } from '../audio/sound';
+import { voice } from '../audio/voice';
 import { useMuted } from '../audio/useMuted';
 import { mapControls } from '../map/controls';
 import type { Rot } from '../map/iso';
@@ -32,6 +33,9 @@ export function CameraWidget() {
   const setUI = useStore((s) => s.setUI);
   const deg = useNorthAngle(rot);
   const muted = useMuted();
+  const voiceOn = useSyncExternalStore(voice.subscribe, voice.on);
+  const voiceReady = useSyncExternalStore(voice.subscribe, voice.available);
+  const voiceLabel = !voiceReady ? 'AI voice guide (needs an ElevenLabs key on the server)' : voiceOn ? 'Turn the AI voice guide off (V)' : 'Turn the AI voice guide on (V)';
 
   return (
     <div className="panel camera-widget pop" role="group" aria-label="Camera and sound">
@@ -70,6 +74,10 @@ export function CameraWidget() {
         onClick={toggleMuted}
       >
         {muted ? <VolumeX size={18} strokeWidth={2.4} /> : <Volume2 size={18} strokeWidth={2.4} />}
+      </button>
+      <button type="button" className="gbtn cam-btn cam-voice" aria-label={voiceLabel} title={voiceLabel} aria-pressed={voiceReady && voiceOn}
+        disabled={!voiceReady} onClick={voice.toggle}>
+        {voiceReady && voiceOn ? <MessageCircleMore size={18} strokeWidth={2.4} /> : <MessageCircleOff size={18} strokeWidth={2.4} />}
       </button>
     </div>
   );

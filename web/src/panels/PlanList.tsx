@@ -5,10 +5,11 @@ import { mapControls } from '../map/controls';
 import { BUILDING_BY_ID } from '../map/layout';
 import { useStore } from '../store';
 
-interface Entry { key: string; Icon: LucideIcon; color: string; name: string; where: string; cost: number; sell: Action; focus?: string }
+export interface Entry { key: string; Icon: LucideIcon; color: string; name: string; where: string; cost: number; sell: Action; focus?: string }
 
-/** Everything placed in Get ready, read from the game state so it always matches the server. */
-function planEntries(s: GameState): Entry[] {
+/** Everything placed (in Get ready, plus emergency buys in the storm), read from the game state so it always
+ *  matches the server. `focus` is the building or circuit it sits on; county-wide items have none. */
+export function planEntries(s: GameState): Entry[] {
   const out: Entry[] = [];
   const seen = new Set<string>();
   for (const c of s.circuits) {

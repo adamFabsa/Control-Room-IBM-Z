@@ -1,6 +1,7 @@
 import { Snowflake } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { startSound } from './audio/sound';
+import { startVoice } from './audio/voice';
 import { gameClock } from './format';
 import { wantMock, wsUrl } from './link/GameLink';
 import { mockLink } from './link/mockLink';
@@ -17,6 +18,7 @@ export function App() {
     return useStore.getState().attach(link);
   }, []);
   useEffect(() => startSound(useStore), []);
+  useEffect(() => startVoice(useStore), []);
 
   const phase = useStore((s) => s.state?.phase ?? 'storm');
   const hasState = useStore((s) => !!s.state);

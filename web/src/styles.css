@@ -606,7 +606,9 @@ kbd {
 
 /* ---------- sound toggle: its own column at the right of the camera widget ---------- */
 .camera-widget .cam-sep { grid-column: 4; grid-row: 1 / span 2; align-self: stretch; width: 2px; margin: 8px 0; border-radius: 2px; background: rgba(255, 255, 255, 0.1); }
-.camera-widget .cam-mute { grid-column: 5; grid-row: 1 / span 2; }
+.camera-widget .cam-mute { grid-column: 5; grid-row: 1; }
+.camera-widget .cam-voice { grid-column: 5; grid-row: 2; }
+.cam-voice[aria-pressed='true'] { color: var(--ice); }
 .cam-mute[aria-pressed='true'] { color: var(--muted); }
 
 /* AI on the decision card and the report (server fields: event.ai_text, option.m2, turning_points) */
