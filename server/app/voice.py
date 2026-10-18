@@ -33,8 +33,8 @@ def _mw(n):
 def line_text(line, state, report=None):
     """The sentence for a line, from the current game; None if it doesn't apply right now."""
     if line == "intro":
-        return ("Welcome to Lights Out. A winter storm reaches Dallas County in three days. You have ten points "
-                "to get ready: protect what matters, place generators, and open a warming center. Then start the storm.")
+        return ("Welcome to Lights Out. A winter storm reaches Dallas County in three days. "
+                "Spend your ten points to get ready, then start the storm.")
     if line == "storm":
         return ("The storm is here. Watch the cut order at the top of the screen and cut neighborhoods to meet it. "
                 "Homes cool fast without power, so rotate who goes dark.")

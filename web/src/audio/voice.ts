@@ -11,6 +11,7 @@ let available = false;
 let on = (() => { try { return localStorage.getItem(STORAGE_KEY) !== '0'; } catch { return true; } })();
 let audio: HTMLAudioElement | null = null;
 let busy = false;
+let gen = 0; // bumped by an interruption, so a line still loading from before it is dropped
 const queue: Line[] = [];
 const listeners = new Set<() => void>();
 const notify = () => listeners.forEach((l) => l());
@@ -34,9 +35,15 @@ function stop(): void {
   busy = false;
 }
 
-/** Queue a line; the newest wins when lines pile up, so the voice never runs behind the game. */
-function say(line: Line): void {
+/** Queue a line; the newest wins when lines pile up, so the voice never runs behind the game. `interrupt`
+ *  (the storm, a new card, the report) cuts off whatever is playing, so the voice talks about what's on screen. */
+function say(line: Line, interrupt = false): void {
   if (!available || !on || isMuted()) return;
+  if (interrupt) {
+    gen++;
+    queue.length = 0;
+    if (audio) { audio.pause(); audio.dispatchEvent(new Event('ended')); } // lets next() move straight on
+  }
   if (queue.length >= 2) queue.shift();
   queue.push(line);
   if (!busy) void next();
@@ -46,9 +53,10 @@ async function next(): Promise<void> {
   const line = queue.shift();
   if (!line) { busy = false; return; }
   busy = true;
+  const g = gen;
   try {
     const r = await fetch('/api/voice', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ line }) });
-    if (r.ok && on && !isMuted()) {
+    if (r.ok && on && !isMuted() && g === gen) {
       const url = URL.createObjectURL(await r.blob());
       audio = new Audio(url);
       await new Promise<void>((done) => {
@@ -86,17 +94,17 @@ export function startVoice(store: VoiceStore): () => void {
   const unMuted = subscribeMuted(() => { if (isMuted()) stop(); });
   const unStore = store.subscribe(({ state: cur }, { state: prev }) => {
     if (!cur || cur === prev) return;
-    const once = (key: string, line: Line) => { if (!said.has(key)) { said.add(key); say(line); } };
+    const once = (key: string, line: Line, interrupt = false) => { if (!said.has(key)) { said.add(key); say(line, interrupt); } };
     if (cur.phase === 'ready' && prev?.phase && prev.phase !== 'ready') said = new Set(); // a new game
     if (cur.phase === 'ready' && gestured) once('intro', 'intro');
-    if (cur.phase === 'storm' && prev?.phase === 'ready') once('storm', 'storm');
+    if (cur.phase === 'storm' && prev?.phase === 'ready') once('storm', 'storm', true);
     if (cur.phase === 'storm' && cur.order_mw > 0 && !(prev && prev.order_mw > 0)) once('order', 'order');
-    if (cur.event && cur.event.id !== prev?.event?.id) once(`card-${cur.event.id}`, 'card');
+    if (cur.event && cur.event.id !== prev?.event?.id) once(`card-${cur.event.id}`, 'card', true);
     for (const n of cur.notices ?? []) {
       if (n.id.startsWith('order-short') || n.id.startsWith('order-hold')) once('short', 'short');
       if (n.kind === 'cold') once('cold', 'cold');
     }
-    if (cur.phase === 'over' && prev?.phase === 'storm') setTimeout(() => once('report', 'report'), 2500);
+    if (cur.phase === 'over' && prev?.phase === 'storm') setTimeout(() => once('report', 'report', true), 2500);
   });
   return () => {
     unStore(); unMuted(); stop();
