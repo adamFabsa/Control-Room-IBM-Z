@@ -132,6 +132,17 @@ export interface Report {
   stress_test?: { storms: number; works: number; worst: string; seconds?: number; cores?: number; collapses?: number };
   stress_test_progress?: { status?: string; done?: number; storms?: number };
   no_power_by_hour?: { t: string[]; playbook_2021: number[]; ai_alone: number[]; player: number[] };
+  /** every hourly series for the data explorer: per game (by) or one shared line (weather, demand) */
+  series?: {
+    t: string[];
+    games: Record<string, string>;
+    metrics: {
+      id: string; label: string; unit: string;
+      by?: Record<'player' | 'playbook_2021' | 'ai_alone', (number | null)[]>;
+      shared?: (number | null)[];
+      reference?: { label: string; values: (number | null)[] };
+    }[];
+  };
   /** DSHS's 22 Dallas County deaths in 2021, scaled by each game's hours in cold homes; null after a grid collapse */
   estimated_deaths?: { player: number | null; playbook_2021: number; ai_alone: number | null; method: string; source: string; source_url: string };
   game_check?: string;

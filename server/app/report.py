@@ -125,7 +125,30 @@ def _stress_for_screen(stress):
     return {**stress, "works": stress["wins"], "worst": worst, "worst_storm": w}
 
 
-def build_report(snapshot, base, job):
+def explorer_series(axis, lines, forecast=None):
+    """Every hourly series the report's data explorer can chart: per game (2021, AI alone, you) or shared."""
+    def per_game(key):
+        return {who: [p.get(key) for p in points] for who, points in lines.items()}
+    player, real = lines["player"], lines["playbook_2021"]
+    gap = {who: [None if p.get("cut_mw") is None or p.get("order_mw") is None else p["cut_mw"] - p["order_mw"] for p in points]
+           for who, points in lines.items()}
+    metrics = [
+        {"id": "people_cold", "label": "People in cold homes", "unit": "people", "by": per_game("people_cold")},
+        {"id": "people_no_power", "label": "People without power", "unit": "people", "by": per_game("people_no_power")},
+        {"id": "cut_mw", "label": "Power cut vs the order", "unit": "MW", "by": per_game("cut_mw"),
+         "reference": {"label": "Your cut order", "values": [p.get("order_mw") for p in player]}},
+        {"id": "order_gap", "label": "Over (+) or short (−) of the order", "unit": "MW", "by": gap},
+        {"id": "cold_person_hours", "label": "Cold person-hours so far", "unit": "person-hours", "by": per_game("cold_person_hours")},
+        {"id": "outside_f", "label": "Outside temperature in Dallas", "unit": "°F", "shared": [p.get("outside_f") for p in real]},
+    ]
+    if forecast is not None and getattr(forecast, "available", False):
+        demand = [forecast.uri.get(t[:13]) for t in axis]
+        if any(v is not None for v in demand):
+            metrics.append({"id": "demand_mw", "label": "Dallas County demand (M1 forecast)", "unit": "MW", "shared": demand})
+    return {"t": axis, "games": {"playbook_2021": "2021 playbook", "ai_alone": "AI alone", "player": "You"}, "metrics": metrics}
+
+
+def build_report(snapshot, base, job, forecast=None):
     you = snapshot["hourly"]
     axis_2021 = base["real_2021"]["hourly"]
     axis = max((axis_2021, base["ai_alone"]["hourly"], you), key=len)
@@ -174,6 +197,8 @@ def build_report(snapshot, base, job):
         steps = snapshot["history"]
         tp["time"] = steps[tp["step"] - 1]["time"] if 0 < tp["step"] <= len(steps) else None
         tp["delta_cold_person_hours"] = -tp["cold_person_hours_change"]  # what the decision did; < 0 saved hours
+    report["series"] = explorer_series(report["chart"]["time"],
+                                       {"playbook_2021": axis_2021, "ai_alone": base["ai_alone"]["hourly"], "player": you}, forecast)
     stress = _stress_for_screen(job.stress)
     if stress:
         report["stress_test"] = stress

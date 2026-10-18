@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { Report } from '../contracts';
 import { fmt, gameClock } from '../format';
 import { compact } from '../panels/hud';
+import { DataExplorer } from './DataExplorer';
 import { useStore } from '../store';
 
 function mockReport(player: number): Report {
@@ -205,13 +206,10 @@ export function ReportScreen() {
             <p>{report.summary ?? 'Reading your storm…'}</p>
           </div>
         </div>
+        <DataExplorer r={report} />
         <div className="report-row even">
+          <Outcomes r={report} />
           <div className="report-col">
-            <div className="panel chart-box">
-              <div className="chart-head"><b>People without power, day by day</b>
-                <span className="legend"><i className="k-2021" />2021 <i className="k-ai" />AI alone <i className="k-you" />You</span></div>
-              <Chart s={report.no_power_by_hour} what="People without power" />
-            </div>
             <div className="panel plan-box">
               <div className="plan">
                 <span className="plan-head"><span className="tile-ico"><ClipboardList size={16} strokeWidth={2.4} /></span>Your plan for next winter</span>
@@ -228,7 +226,6 @@ export function ReportScreen() {
               )}
             </div>
           </div>
-          <Outcomes r={report} />
         </div>
         {linkKind === 'mock' && <p className="center muted small">Mock numbers for the screen. The real report comes from GET /api/report.</p>}
       </div>

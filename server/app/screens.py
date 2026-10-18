@@ -77,9 +77,16 @@ class Notices:
         if now["gas"] and not p["gas"]:
             self._add("gas", "The gas compressor lost power: every cut order is 15% bigger until it's back.", s, "gas-1")
 
-    def ai(self, s, title, choice):
-        target = _target(title)
-        self._add("info", f"AI co-pilot chose “{choice}” for: {title}", s, target or "ai")
+    def advise(self, s, event):
+        """A routine card that didn't stop the game, as a notice saying what the player can do about it."""
+        kind = event.get("kind")
+        target = _target(event.get("title"), event.get("text"))
+        if kind == "cold":
+            self._add("cold", f"{event['title']} {event['text']} Restore it, or open a warming center.", s, target or "cold")
+        elif kind == "short":
+            self._add("order", f"{event['title']} Cut more neighborhoods: 30% short for 30 minutes collapses the grid.", s, "short")
+        else:
+            self._add("order", f"{event['title']} Cut more neighborhoods to meet it.", s, "order")
 
     def restored(self, s, circuit_id, area):
         self._add("restore", f"{area} ({circuit_id}) is back on, as you scheduled.", s, circuit_id)

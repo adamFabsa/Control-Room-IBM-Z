@@ -68,7 +68,8 @@ def timeline_points(timeline):
     for t in timeline:
         if points and points[-1]["time"] == t["time"]:
             points.pop()
-        points.append({"time": t["time"], "people_cold": t["people_cold"], "people_no_power": t.get("people_no_power", 0)})
+        points.append({k: t.get(k) for k in ("time", "people_cold", "people_no_power", "outside_f", "order_mw", "cut_mw",
+                                             "cold_person_hours")})
     return points
 
 

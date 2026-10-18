@@ -107,7 +107,7 @@ async def get_report():
         await asyncio.sleep(0.2)
     snapshot = session.snapshot()
     base = await asyncio.to_thread(baselines, session.storm, session.seed)
-    return build_report(snapshot, base, session.job)
+    return build_report(snapshot, base, session.job, session.forecast)
 
 
 @app.websocket("/ws")

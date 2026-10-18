@@ -12,16 +12,17 @@ from .screens import Notices, decorate
 
 log = logging.getLogger("controlroom")
 
-# Pacing: the storm (114 game hours) plays in about a minute at the starting speed; 1-3 are for slower play.
+# Pacing: the storm (114 game hours) takes about 2 minutes at the starting speed, about 1 at speed 4.
 SECONDS_PER_GAME_HOUR = {1: 5, 2: 2.5, 3: 1, 4: 0.5, 5: 0.25}
-START_SPEED = 4
-# Quick play (the default): the clock fast-forwards while there is no cut order and every neighborhood has power,
-# and the AI co-pilot answers routine cards. Only cards that put a critical building at risk stop the game: every
-# one the player's own cut causes, and the first SHOW_ALERTS ice, fuel or homes-getting-cold cards.
-# {"type": "new_game", "quick": false} plays every card yourself, without fast-forward.
+START_SPEED = 3
+# Quick play (the default) keeps the player in charge without a card every game hour: the clock fast-forwards while
+# there is no cut order and every neighborhood has power, and routine cards (order rose, a small shortfall, homes
+# getting cold) don't stop the game. They take their do-nothing option, so nothing is done for the player, and
+# become a notice saying what to do. Cards that stop the game: a cut that would darken a critical building, ice
+# or fuel emergencies, and a shortfall deep enough to threaten a collapse. "quick": false shows every card.
 QUICK_DEFAULT = os.environ.get("CONTROLROOM_QUICK", "1") == "1"
 QUIET_SECONDS_PER_GAME_HOUR = 0.1
-SHOW_ALERTS = 2
+SEVERE_SHORTFALL = 0.2  # of the order; the grid collapses at 30% short for 30 minutes
 STEPS_PER_GAME_HOUR = 12  # step() advances 5 game minutes
 TICK_S = 0.1  # at most 10 state messages a second
 
@@ -37,7 +38,6 @@ class GameSession:
 
     def new_game(self, storm="uri2021", seed=42, quick=None):
         self.quick = QUICK_DEFAULT if quick is None else bool(quick)
-        self.alerts_shown = set()  # ids of the ice/fuel cards shown to the player in quick play
         if getattr(self, "job", None):
             self.job.cancel()
         self.job = ReportJob()
@@ -144,7 +144,7 @@ class GameSession:
             if kind == "start_storm":
                 self.paused = False
                 self.speed = START_SPEED
-            self._auto_answer()
+            self._defer_routine()
             if kind == "cut" and action.get("minutes"):  # a timed cut: the server restores it later
                 self.timed_cuts[action["circuit"]] = step + max(1, round(float(action["minutes"]) / 5))
             elif kind in ("cut", "restore"):
@@ -155,39 +155,33 @@ class GameSession:
         """Nothing to decide: no cut order and every neighborhood has power, so quick play fast-forwards."""
         return self.quick and s["phase"] == "storm" and s["order_mw"] == 0 and all(c["on"] for c in s["circuits"])
 
-    def _shows(self, event):
-        """In quick play, is this card one the player sees (the rest the AI co-pilot answers)?"""
+    def _stops(self, event, s):
+        """Does this card stop the game for the player? In quick play only the decisions that matter do."""
         if not self.quick:
             return True
         kind = event.get("kind")
-        if kind == "critical_cut":  # the player's own cut put a critical building at risk: their call
+        if kind in ("critical_cut", "ice", "fuel"):  # a hospital, water plant or gas station at risk
             return True
-        if kind in ("ice", "fuel", "cold") and (event["id"] in self.alerts_shown or len(self.alerts_shown) < SHOW_ALERTS):
-            self.alerts_shown.add(event["id"])
-            return True
+        if kind == "short":
+            return s["order_mw"] - s["cut_mw"] > SEVERE_SHORTFALL * s["order_mw"]
         return False
 
-    def _auto_answer(self):
-        """Quick play: answer routine open cards with the AI pick, logged like a player's choice. True if any."""
-        answered = False
+    def _defer_routine(self):
+        """Quick play: routine cards take their do-nothing option (the last one; nothing is done for the player),
+        logged like any choice, and become a notice. True if any were deferred."""
+        deferred = False
         for _ in range(20):  # a cut can queue several cards
             s = self.state()
             event = s.get("event")
-            if not event or self._shows(event):
+            if not event or self._stops(event, s):
                 break
-            options = event["options"]
-            pick = next((o for o in options if o["ai_pick"]), options[0])
-            for option in [pick] + [o for o in options if o is not pick]:
-                try:
-                    self._engine_action({"type": "choose", "event": event["id"], "option": option["id"]})
-                    self.notices.ai(s, event["title"], option["label"])
-                    answered = True
-                    break
-                except Exception:
-                    continue
-            else:
+            try:
+                self._engine_action({"type": "choose", "event": event["id"], "option": event["options"][-1]["id"]})
+            except Exception:
                 break
-        return answered
+            self.notices.advise(s, event)
+            deferred = True
+        return deferred
 
     def _engine_action(self, action):
         """Apply an action to the engine and log it for replays; returns the engine step it happened at."""
@@ -255,7 +249,7 @@ class GameSession:
                     s = self.game.state()
                     self.history.append({"time": s["time"], "people_cold": s["totals"]["people_cold"]})
                     self._restore_due(s.get("step", self.steps))
-                    if s.get("event") and self._auto_answer():
+                    if s.get("event") and self._defer_routine():
                         s = self.game.state()
                     if s["phase"] != "storm" or s.get("event"):
                         owed = 0.0
