@@ -103,6 +103,8 @@ export const AREA_LABELS: { text: string; x: number; y: number; minor?: boolean;
   const areas = [...byArea].map(([text, [x, y, n]]) => ({ text, x: x / n, y: y / n + 1.0, kind: 'area' as const, minZoom: 0 }));
   const places = G.places.map((p) => ({ text: p.name, x: p.x, y: p.z, minor: true, kind: /Lake|River/.test(p.name) ? 'water' as const : 'place' as const, minZoom: 1.15 }));
   const campuses = (G.campuses ?? []).map((c) => ({ text: c.name, x: c.x, y: c.z, minor: true, kind: 'campus' as const, minZoom: 2.2 }));
-  const landmarks = (G.landmarks ?? []).map((l) => ({ text: l.name, x: l.x, y: l.z, minor: true, kind: 'landmark' as const, minZoom: l.name === 'Dallas Hall' ? 14 : 6 }));
+  // the famous ones show from a city-wide zoom; downtown's cluster waits until there's room; Dallas Hall is for street level
+  const close: Record<string, number> = { 'Dallas Hall': 14, 'Dealey Plaza': 5, 'Klyde Warren Park': 5, 'Bank of America Plaza': 5, 'Margaret Hunt Hill Bridge': 4 };
+  const landmarks = (G.landmarks ?? []).map((l) => ({ text: l.name, x: l.x, y: l.z, minor: true, kind: 'landmark' as const, minZoom: close[l.name] ?? 2.5 }));
   return [...areas, ...places, ...campuses, ...landmarks];
 })();

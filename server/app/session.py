@@ -12,20 +12,20 @@ from .screens import Notices, decorate
 
 log = logging.getLogger("controlroom")
 
-# Pacing: the storm is 114 game hours. At the starting speed it plays in about 4 to 5 minutes with 15 or so
-# decisions (speed 4: about 4 minutes, speed 5: about 3), measured with a human-paced player on the real engine.
-SECONDS_PER_GAME_HOUR = {1: 5, 2: 3, 3: 1.5, 4: 1, 5: 0.5}
+# Pacing: the storm is 114 game hours. At the starting speed it plays in about 3 to 4 minutes with 15 or so
+# decisions (speed 4: under 3 minutes), measured with a human-paced player on the real engine.
+SECONDS_PER_GAME_HOUR = {1: 4, 2: 2.5, 3: 1.2, 4: 0.8, 5: 0.4}
 START_SPEED = 3
 # Quick play (the default) keeps the player in charge without a card every game hour. The clock fast-forwards while
 # there is no cut order and every neighborhood has power. Cards that stop the game: a cut that would darken a
-# critical building, ice and fuel emergencies, the first order rise and then one every 3 game hours, a shortfall
-# past 10% of the order, and homes getting cold at most every 6 game hours. The rest take their do-nothing option
+# critical building, ice and fuel emergencies, the first order rise and then one every 4 game hours, a shortfall
+# past 15% of the order, and homes getting cold at most every 8 game hours. The rest take their do-nothing option
 # (nothing is done for the player) and become a notice saying what to do. "quick": false shows every card.
 QUICK_DEFAULT = os.environ.get("CONTROLROOM_QUICK", "1") == "1"
 QUIET_SECONDS_PER_GAME_HOUR = 0.4
-SHORT_STOP = 0.1  # of the order: a "you are short" card past this stops the game
-ORDER_STOP_GAP = 36  # engine steps (3 game hours) between order-rise cards that stop the game
-COLD_STOP_GAP = 72  # 6 game hours between "getting cold" cards that stop the game
+SHORT_STOP = 0.15  # of the order: a "you are short" card past this stops the game
+ORDER_STOP_GAP = 48  # engine steps (4 game hours) between order-rise cards that stop the game
+COLD_STOP_GAP = 96  # 8 game hours between "getting cold" cards that stop the game
 # The grid collapses when the cut stays 30% short for 30 game minutes, faster than anyone can react at speed, and
 # the engine's own shortfall card has a cooldown. So past 20% short the clock stops and the order bar says how much
 # to cut; it starts again once the player's cuts bring the gap under 10%. Nothing is cut for the player, and "play"

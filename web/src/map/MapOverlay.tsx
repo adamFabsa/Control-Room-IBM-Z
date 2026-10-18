@@ -1,20 +1,22 @@
 // HTML layer over the canvas: status markers, map labels and the co-pilot pin.
 // React renders the content; positions are written straight to the DOM every frame, and lower-priority
 // labels hide when they would overlap a more important one, so the map never turns into a pile of tags.
-import { Bot, CheckCircle2, GraduationCap, House, Landmark, Moon, Plus, PlugZap, Shield, Thermometer, Wrench, ZapOff, type LucideIcon } from 'lucide-react';
+import { Bot, CheckCircle2, Droplets, Flame, GraduationCap, HeartPulse, Hospital, House, Landmark, Moon, Plus, PlugZap, School, Shield, Thermometer, Wrench, ZapOff, type LucideIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import type { Circuit } from '../contracts';
 import { dur, fmt, shortDur } from '../format';
 import { planEntries } from '../panels/PlanList';
 import { useStore } from '../store';
 import { anchorOf } from './controls';
-import { AREA_LABELS, BUILDING_BY_ID, BUILDINGS, CIRCUIT_BY_ID, CIRCUITS } from './layout';
+import { AREA_LABELS, BUILDING_BY_ID, BUILDINGS, CIRCUIT_BY_ID, CIRCUITS, type BuildingKind } from './layout';
 import './map.css';
 import type { MapScene } from './types';
 
 type Anchor = [gx: number, gy: number, height: number];
 /** Higher wins a collision. */
-const PRI = { copilot: 60, target: 58, badge: 55, alert: 50, selected: 40, marker: 30, area: 20, campus: 15, place: 10, landmark: 8 } as const;
+const PRI = { copilot: 60, target: 58, badge: 55, alert: 50, selected: 40, critical: 32, marker: 30, area: 20, campus: 15, place: 10, landmark: 8 } as const;
+/** The five buildings the game is about, named on the map at every zoom. */
+const CRIT_ICON: Record<BuildingKind, LucideIcon> = { hospital: Hospital, clinic: HeartPulse, water: Droplets, gas: Flame, school: School };
 /** County-wide items (conservation, repair crews) float over Downtown, the county seat. */
 const COUNTY_ANCHOR = 'C-01';
 const BADGE_LIFT = 46, BADGE_STEP = 30;
@@ -77,7 +79,9 @@ export function MapOverlay({ scene }: { scene: MapScene }) {
       for (const it of list) {
         scene.toScreen(it.at[0], it.at[1], it.at[2], p);
         p.y -= it.lift;
-        const w = it.el.offsetWidth, h = it.el.offsetHeight;
+        // badges and tags sit absolutely inside a zero-size anchor: measure what is drawn, not the anchor
+        const box = it.el.offsetWidth ? it.el : ((it.el.firstElementChild as HTMLElement | null) ?? it.el);
+        const w = box.offsetWidth, h = box.offsetHeight;
         if (it.clamp) { // keep speech bubbles on screen
           p.x = Math.max(w / 2 + 16, Math.min(W() - w / 2 - 16, p.x));
           p.y = Math.max(h + 190, Math.min(H() - 120, p.y)); // below the top panels, above the tool dock
@@ -102,7 +106,8 @@ export function MapOverlay({ scene }: { scene: MapScene }) {
   const day = phase === 'ready';
   // where each placed item sits, stacked when several share a building or district
   const stack = new Map<string, number>();
-  const badges = (state ? planEntries(state) : []).map((e) => {
+  // a protected district already shows a shield on its pin, so it needs no badge too
+  const badges = (state ? planEntries(state) : []).filter((e) => !e.key.startsWith('protect-')).map((e) => {
     const at = e.focus ?? COUNTY_ANCHOR;
     const i = stack.get(at) ?? 0;
     stack.set(at, i + 1);
@@ -126,6 +131,22 @@ export function MapOverlay({ scene }: { scene: MapScene }) {
           {l.text}
         </div>
       ))}
+      {BUILDINGS.map((b) => {
+        const st = state?.buildings.find((x) => x.id === b.id);
+        const lineOn = circuits?.some((c) => (c.parent ?? c.id) === b.circuit && c.on) ?? true;
+        const tone = st && !st.on ? 'dark' : st?.generator && !lineOn ? 'gen' : 'on';
+        const Icon = CRIT_ICON[b.kind];
+        return (
+          // just above the model, under any placed-item badge (those sit BADGE_LIFT higher)
+          <div key={`crit-${b.id}`} className={`ov-crit ${b.kind} ${tone}`} ref={bind(`crit-${b.id}`, [b.at[0], b.at[1], scene.topOf(b.id) + 0.12], PRI.critical, 'bottom', 0, 10)}
+            title={tone === 'dark' ? `${b.name}: no power` : tone === 'gen' ? `${b.name}: running on its generator` : b.name}>
+            <Icon size={13} strokeWidth={2.5} aria-hidden />
+            {b.name}
+            {tone === 'dark' && <b>No power</b>}
+            {tone === 'gen' && <b>Generator</b>}
+          </div>
+        );
+      })}
       {CIRCUITS.map((info) => {
         const c = circuits?.find((x) => x.id === info.id);
         const { kind, Icon, label } = markerState(c);

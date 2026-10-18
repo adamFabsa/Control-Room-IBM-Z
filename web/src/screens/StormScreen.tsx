@@ -76,17 +76,23 @@ export function StormScreen() {
   const target = useStore((s) => s.state?.event?.target);
   const hide = useStore((s) => s.ui.hidePanels);
 
-  // ease the camera to whatever the decision is about, then back out to the whole county once it's answered
+  // fly to whatever the decision is about, then, once it's answered, back to the view the player had before
+  // (cards that come one after another keep the first view)
   const hadCard = useRef(false);
+  const before = useRef<[number, number, number] | null>(null);
+  const moved = useRef(false);
   useEffect(() => {
     if (eventId) {
+      if (!hadCard.current) { before.current = mapControls.view(); moved.current = false; }
       hadCard.current = true;
-      if (target) mapControls.focus(target, 3.4);
+      if (target) { mapControls.focus(target, 3.4); moved.current = true; }
       return;
     }
     if (!hadCard.current) return;
     hadCard.current = false;
-    const id = setTimeout(() => mapControls.refit(), 1500);
+    if (!moved.current) return;
+    const back = before.current;
+    const id = setTimeout(() => (back ? mapControls.flyTo(back) : mapControls.refit()), 900);
     return () => clearTimeout(id);
   }, [eventId, target]);
 

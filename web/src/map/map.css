@@ -30,6 +30,33 @@
 .ov-day .ov-place.campus { color: rgba(128, 36, 30, 0.95); }
 .ov-day .ov-place.landmark { color: rgba(30, 40, 56, 0.85); }
 
+/* ---------- the five critical buildings: small name pills just above their models ---------- */
+.ov-crit {
+  translate: -50% -100%; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; user-select: none;
+  padding: 3px 8px 3px 6px; border-radius: 999px; font: 700 11px/1.1 var(--sans); letter-spacing: 0.01em;
+  color: #eef3f9; background: rgba(10, 16, 28, 0.8); border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35); pointer-events: none; --k: #9fd6ff;
+}
+.ov-crit svg { flex: none; color: var(--k); }
+.ov-crit.hospital { --k: #ff8f87; }
+.ov-crit.clinic { --k: #ffa6c9; }
+.ov-crit.water { --k: #7cc4fa; }
+.ov-crit.gas { --k: #f2a93b; }
+.ov-crit.school { --k: #ffb38a; }
+.ov-crit b { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding-left: 5px; border-left: 1px solid rgba(255, 255, 255, 0.2); }
+.ov-crit.gen { border-color: rgba(242, 201, 76, 0.7); }
+.ov-crit.gen b { color: #f2c94c; }
+.ov-crit.dark { border-color: rgba(255, 122, 69, 0.85); background: rgba(58, 18, 10, 0.88); }
+.ov-crit.dark b { color: #ff9b73; }
+.ov-day .ov-crit { color: #142033; background: rgba(255, 255, 255, 0.94); border-color: rgba(20, 32, 50, 0.14); box-shadow: 0 2px 6px rgba(20, 32, 50, 0.18); }
+.ov-day .ov-crit b { border-left-color: rgba(20, 32, 50, 0.18); }
+.ov-day .ov-crit.hospital { --k: #d23a30; }
+.ov-day .ov-crit.clinic { --k: #c2387a; }
+.ov-day .ov-crit.water { --k: #1d6fc4; }
+.ov-day .ov-crit.gas { --k: #b86e00; }
+.ov-day .ov-crit.school { --k: #b4532f; }
+.ov-day .ov-crit.dark { background: #fff1ec; }
+
 /* ---------- status markers ---------- */
 .ov-anchor { translate: -50% -100%; }
 .ov-marker {

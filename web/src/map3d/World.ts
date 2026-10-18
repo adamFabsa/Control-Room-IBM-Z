@@ -41,6 +41,7 @@ const KIT = (key: string) => `${BASE}models/${key}.glb`;
 const CARS = ['sedan', 'suv', 'van', 'taxi', 'hatchback-sports', 'delivery', 'police', 'truck'];
 // critical buildings: footprint and height in map units (a little larger than life, so they read)
 const CRIT: Record<BuildingInfo['kind'], [number, number]> = { hospital: [0.24, 0.11], clinic: [0.12, 0.03], water: [0.26, 0.035], gas: [0.16, 0.035], school: [0.2, 0.028] };
+const CRIT_SCALE = 1.7; // the game's five buildings, drawn bigger than the city around them so they stand out
 const M = 965.6; // meters per map unit (0.6 mi)
 const m2u = (meters: number) => (meters * VEX) / M; // a real height in map units
 const ICE = 0x7cc4fa, ICE_NIGHT = ICE, ICE_DAY = 0x1d6fc4, AMBER = 0xf2a93b, COLD = 0xff7a45, GEN = 0xf2c94c;
@@ -812,7 +813,7 @@ export class World implements MapScene {
 
   private addCritical(b: BuildingInfo): void {
     const [x, z] = b.at;
-    const [w, H] = CRIT[b.kind], d = w;
+    const [w, H] = CRIT[b.kind].map((v) => v * CRIT_SCALE) as [number, number], d = w;
     const grp = new THREE.Group();
     const glass = this.glassMat();
     const on = this.bOn[b.id] ? 1 : 0;

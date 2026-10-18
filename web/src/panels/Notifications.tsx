@@ -15,8 +15,8 @@ const TITLES: Record<NoticeKind, string> = {
   cold: 'Homes getting cold', order: 'New cut order', ice: 'Ice on the lines', repair: 'Line repaired',
   restore: 'Power back on', water: 'Water', gas: 'Gas supply', info: 'AI co-pilot',
 };
-const LIFE_MS = 9000;
-const MAX_SHOWN = 3;
+const LIFE_MS = 7000;
+const MAX_SHOWN = 2; // more than two at once is a wall of text
 
 export function Notifications() {
   const toasts = useStore((s) => s.toasts);

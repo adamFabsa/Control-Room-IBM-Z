@@ -19,6 +19,9 @@ export function anchorOf(id: string): [number, number] | null {
 export const mapControls = {
   zoomBy(k: number) { world?.rig.zoomBy(k); },
   refit() { world?.rig.refit(); },
+  /** The camera's view now ([x, z, zoom]), and a smooth flight back to one. */
+  view(): [number, number, number] | null { return world?.rig.view() ?? null; },
+  flyTo(v: [number, number, number]) { world?.rig.easeTo(v[0], v[1], v[2]); },
   /** Ease to a neighborhood or building. `zoom` is on the old county scale (3 ≈ a few blocks); homes are now
    *  at near-real size, so it is doubled here. */
   focus(id: string, zoom = 3) {
