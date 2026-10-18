@@ -611,14 +611,8 @@ export class World implements MapScene {
     flat(ribbons(geo.interstates, 0.0016, [0.012, 0.016]), new THREE.MeshStandardMaterial({ color: snow ? 0xc8d0da : 0xe8e2c4, roughness: 0.6 }), 0.0125);
     this.buildStreets();
 
-    // a chimney on one house in ~150, smoking while it has power
-    const hb = this.homes.housesBy;
-    hb.forEach((list, k) => {
-      for (let j = 0; j < list.length; j += 150) {
-        const at = this.homes!.rectAt(list[(j * 7919) % list.length]);
-        this.chimneys.push({ p: new THREE.Vector3(at.x, at.top * 1.25, at.z), circuit: k, next: Math.random() * 4000, big: false });
-      }
-    });
+    // No house chimneys: from a playing distance their puffs read as stray floating bubbles over the map (most of
+    // all in daylight, during Get ready). Only the power plant's stacks steam (buildInfrastructure).
 
     this.buildDowntown();
     this.buildLandmarks();
